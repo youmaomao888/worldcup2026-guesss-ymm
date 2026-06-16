@@ -50,6 +50,7 @@ header { background: var(--green); color: white; position: sticky; top: 0; z-ind
 .header-inner { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; max-width: 600px; margin: 0 auto; }
 .header-title { font-size: 16px; font-weight: 600; }
 .header-user { font-size: 13px; background: rgba(255,255,255,0.2); padding: 4px 10px; border-radius: 20px; cursor: pointer; }
+.champ-badge { margin-left: 2px; font-size: 14px; }
 .tab-bar { display: flex; background: white; border-bottom: 1px solid var(--border); position: sticky; top: 49px; z-index: 99; max-width: 600px; margin: 0 auto; }
 .tab-btn { flex: 1; padding: 12px 4px; border: none; background: transparent; font-size: 13px; color: var(--text-muted); cursor: pointer; border-bottom: 2.5px solid transparent; font-weight: 500; }
 .tab-btn.active { color: var(--green); border-bottom-color: var(--green); }
@@ -107,6 +108,7 @@ header { background: var(--green); color: white; position: sticky; top: 0; z-ind
 .rank-num.bronze { color: #b45309; }
 .rank-info { flex: 1; }
 .rank-name { font-size: 15px; font-weight: 600; }
+.rank-champ { font-size: 11px; margin-left: 3px; vertical-align: super; white-space: nowrap; }
 .rank-detail { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 .rank-score { font-size: 22px; font-weight: 700; color: var(--green); }
 .rank-score-label { font-size: 11px; color: var(--text-muted); text-align: right; }
@@ -483,10 +485,22 @@ async function saveUserData() {
 }
 
 // ── 导航 ──
+// 头部用户：昵称 + 所选冠军旗（戴在身上的应援）
+function updateHeaderUser() {
+  const el = document.getElementById('header-user');
+  if (!el) return;
+  let html = '&#x1F464; ' + escapeHtml(currentUser || '');
+  if (userChampion) {
+    const t = champTeams.find(x => x.n === userChampion);
+    if (t) html += ' <span class="champ-badge">&#x1F3C6;' + t.f + '</span>';
+  }
+  el.innerHTML = html;
+}
+
 function goToMain(name) {
   document.getElementById('login-screen').classList.remove('active');
   document.getElementById('main-screen').classList.add('active');
-  document.getElementById('header-user').textContent = '👤 ' + name;
+  updateHeaderUser();
   renderMatches(); renderChampion(); renderMyPicks();
   // 后台拉取大家的预测和留言，回来后刷新赛程
   loadSocialData().then(renderMatches);
@@ -515,7 +529,7 @@ window.enterApp = function() {
   goToMain(name);
   // 后台加载云端数据，成功后刷新界面
   loadUserData()
-    .then(() => { renderMatches(); renderChampion(); renderMyPicks(); })
+    .then(() => { updateHeaderUser(); renderMatches(); renderChampion(); renderMyPicks(); })
     .catch(() => showToast('云端数据加载失败，已用空白进入'));
 };
 
@@ -690,16 +704,18 @@ async function renderLeaderboard() {
     const users = rows.map(row => {
       let preds = {};
       try { preds = JSON.parse(row.predictions) || {}; } catch {}
-      return { name: row.nickname, ...calcScore(preds) };
+      return { name: row.nickname, champion: row.champion || '', ...calcScore(preds) };
     });
     users.sort((a, b) => b.total - a.total || b.exact - a.exact);
     const medals = ['&#x1F947;', '&#x1F948;', '&#x1F949;'];
     c.innerHTML = users.map((u, i) => {
       const isMe = u.name === currentUser;
       const nc = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+      const ct = u.champion ? champTeams.find(x => x.n === u.champion) : null;
+      const champBadge = ct ? '<sup class="rank-champ" title="押冠军：' + u.champion + '">&#x1F3C6;' + ct.f + '</sup>' : '';
       return '<div class="rank-card ' + (isMe ? 'me ' : '') + (i === 0 ? 'top1' : '') + '">'
         + '<div class="rank-num ' + nc + '">' + (medals[i] || (i + 1)) + '</div>'
-        + '<div class="rank-info"><div class="rank-name">' + u.name + (isMe ? ' &#x1F448;' : '') + '</div>'
+        + '<div class="rank-info"><div class="rank-name">' + escapeHtml(u.name) + champBadge + (isMe ? ' &#x1F448;' : '') + '</div>'
         + '<div class="rank-detail">&#x1F3AF; ' + u.exact + '场完全猜中 &nbsp;&#x2705; ' + u.correct + '场猜中胜负</div></div>'
         + '<div><div class="rank-score">' + u.total + '</div><div class="rank-score-label">分</div></div></div>';
     }).join('');
@@ -724,7 +740,7 @@ function renderChampion() {
 window.pickChampion = async function(name) {
   userChampion = name;
   try {
-    await saveUserData(); renderChampion(); showToast('已选 ' + name + ' 为冠军！');
+    await saveUserData(); renderChampion(); updateHeaderUser(); showToast('已选 ' + name + ' 为冠军！');
   } catch (e) {
     showToast('保存失败，请重试');
   }
@@ -781,7 +797,7 @@ if (savedName) {
   // 立刻进入，后台再补数据
   goToMain(savedName);
   loadUserData()
-    .then(() => { renderMatches(); renderChampion(); renderMyPicks(); })
+    .then(() => { updateHeaderUser(); renderMatches(); renderChampion(); renderMyPicks(); })
     .catch(() => {});
 }
 </script>
