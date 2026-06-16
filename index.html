@@ -18,12 +18,28 @@
 body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif; background: #f0f4f0; color: var(--text); min-height: 100vh; }
 .screen { display: none; }
 .screen.active { display: block; }
-#login-screen { min-height: 100vh; align-items: center; justify-content: center; background: linear-gradient(135deg, #1a4a2e 0%, #2d7a4f 50%, #1a8a4a 100%); padding: 2rem; }
+#login-screen { min-height: 100vh; align-items: center; justify-content: center; background: linear-gradient(135deg, #1a4a2e, #2d7a4f, #1a8a4a, #2d7a4f); background-size: 280% 280%; animation: bgShift 14s ease infinite; padding: 2rem; position: relative; overflow: hidden; }
 #login-screen.active { display: flex; }
-.login-box { background: white; border-radius: 20px; padding: 2.5rem 2rem; text-align: center; width: 100%; max-width: 380px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
-.login-emoji { font-size: 56px; margin-bottom: 1rem; }
+@keyframes bgShift { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+/* 背景缓缓飘浮的足球点缀 */
+#login-screen::before, #login-screen::after { content: '\26BD'; position: absolute; font-size: 80px; opacity: .08; animation: floatBall 9s ease-in-out infinite; }
+#login-screen::before { top: 12%; left: 10%; }
+#login-screen::after { bottom: 14%; right: 12%; font-size: 120px; animation-duration: 12s; animation-direction: reverse; }
+@keyframes floatBall { 0%,100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-30px) rotate(180deg); } }
+.login-box { position: relative; z-index: 1; background: white; border-radius: 20px; padding: 2.5rem 2rem; text-align: center; width: 100%; max-width: 380px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); animation: boxIn .7s cubic-bezier(.16,1,.3,1) both; }
+@keyframes boxIn { from { opacity: 0; transform: translateY(28px) scale(.95); } to { opacity: 1; transform: none; } }
+.login-emoji { font-size: 56px; margin-bottom: 1rem; display: inline-block; animation: ballBounce 1.7s ease-in-out infinite; }
+@keyframes ballBounce { 0%,100% { transform: translateY(0) rotate(-10deg); } 50% { transform: translateY(-18px) rotate(10deg); } }
 .login-box h1 { font-size: 24px; font-weight: 700; line-height: 1.3; margin-bottom: .75rem; }
-.login-sub { font-size: 14px; color: var(--text-muted); margin-bottom: 1.75rem; line-height: 1.6; }
+.login-sub { font-size: 14px; color: var(--text-muted); margin-bottom: 1.25rem; line-height: 1.6; }
+.star-strip { overflow: hidden; margin: 0 -8px 1.5rem; -webkit-mask: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); mask: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); }
+.star-track { display: flex; gap: 8px; width: max-content; animation: marquee 20s linear infinite; }
+.star-strip:hover .star-track { animation-play-state: paused; }
+.star-chip { display: flex; align-items: center; gap: 6px; padding: 6px 12px 6px 6px; background: var(--green-light); border-radius: 20px; font-size: 13px; white-space: nowrap; }
+.star-chip .num { background: var(--green); color: #fff; font-size: 11px; font-weight: 700; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.star-chip .sflag { font-size: 15px; }
+.star-chip .sname { font-weight: 600; color: var(--text); }
+@keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 #nickname-input { width: 100%; padding: 14px 16px; border: 1.5px solid var(--border); border-radius: var(--radius); font-size: 16px; text-align: center; margin-bottom: 12px; outline: none; transition: border-color .2s; }
 #nickname-input:focus { border-color: var(--green); }
 #login-btn { width: 100%; padding: 14px; background: var(--green); color: white; border: none; border-radius: var(--radius); font-size: 16px; font-weight: 600; cursor: pointer; }
@@ -41,6 +57,7 @@ header { background: var(--green); color: white; position: sticky; top: 0; z-ind
 .tab-content { display: none; }
 .tab-content.active { display: block; }
 .filter-row { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+#sync-note { font-size: 11px; color: var(--text-muted); text-align: center; margin-bottom: 12px; }
 .filter-btn { padding: 5px 14px; border-radius: 20px; border: 1px solid var(--border); background: white; font-size: 12px; color: var(--text-muted); cursor: pointer; }
 .filter-btn.active { background: var(--green); color: white; border-color: var(--green); }
 .match-card { background: white; border-radius: var(--radius); padding: 14px; margin-bottom: 10px; border: 1px solid var(--border); }
@@ -150,6 +167,9 @@ header { background: var(--green); color: white; position: sticky; top: 0; z-ind
     <div class="login-emoji">&#x26BD;</div>
     <h1>世界杯2026<br>比分预测挑战</h1>
     <p class="login-sub">和朋友一起预测，赛后看谁猜得最准！</p>
+    <div class="star-strip">
+      <div class="star-track" id="star-track"></div>
+    </div>
     <input id="nickname-input" type="text" placeholder="输入你的昵称（2-10字）" maxlength="10">
     <button id="login-btn" onclick="enterApp()">进入预测 →</button>
     <p class="login-hint">昵称是你的身份标识，同设备下次自动登录</p>
@@ -177,6 +197,7 @@ header { background: var(--green); color: white; position: sticky; top: 0; z-ind
         <button class="filter-btn" onclick="filterMatches('upcoming',this)">即将开始</button>
         <button class="filter-btn" onclick="filterMatches('done',this)">已结束</button>
       </div>
+      <div id="sync-note">比分自动同步中...</div>
       <div id="matches-list"></div>
     </div>
     <div id="tab-leaderboard" class="tab-content">
@@ -283,29 +304,105 @@ async function dbAddComment(matchId, nickname, text) {
 }
 
 // ── 赛程数据 ──
+// 数据来源：ESPN / CBS Sports 2026世界杯赛程赛果，截至北京时间2026/6/16
+// rhs/ras = 主队/客队最终比分；status: done已结束 / live进行中 / upcoming未开始
 const matches = [
-  {id:'m1',date:'6/11',home:'墨西哥',hf:'&#x1F1F2;&#x1F1FD;',away:'南非',af:'&#x1F1FF;&#x1F1E6;',group:'A',rhs:2,ras:0,status:'done'},
-  {id:'m2',date:'6/12',home:'美国',hf:'&#x1F1FA;&#x1F1F8;',away:'巴拉圭',af:'&#x1F1F5;&#x1F1FE;',group:'D',rhs:4,ras:1,status:'done'},
-  {id:'m3',date:'6/12',home:'加拿大',hf:'&#x1F1E8;&#x1F1E6;',away:'波黑',af:'&#x1F1E7;&#x1F1E6;',group:'B',rhs:1,ras:1,status:'done'},
-  {id:'m4',date:'6/13',home:'巴西',hf:'&#x1F1E7;&#x1F1F7;',away:'摩洛哥',af:'&#x1F1F2;&#x1F1E6;',group:'C',rhs:1,ras:1,status:'done'},
-  {id:'m6',date:'6/13',home:'瑞士',hf:'&#x1F1E8;&#x1F1ED;',away:'卡塔尔',af:'&#x1F1F6;&#x1F1E6;',group:'B',rhs:1,ras:1,status:'done'},
-  {id:'m7',date:'6/13',home:'苏格兰',hf:'&#x1F3F4;',away:'海地',af:'&#x1F1ED;&#x1F1F9;',group:'C',rhs:1,ras:0,status:'done'},
-  {id:'m8',date:'6/14',home:'德国',hf:'&#x1F1E9;&#x1F1EA;',away:'库拉索',af:'&#x1F1E8;&#x1F1FC;',group:'E',rhs:7,ras:1,status:'done'},
-  {id:'m9',date:'6/14',home:'西班牙',hf:'&#x1F1EA;&#x1F1F8;',away:'佛得角',af:'&#x1F1E8;&#x1F1FB;',group:'H',rhs:0,ras:0,status:'done'},
-  {id:'m12',date:'6/15',home:'比利时',hf:'&#x1F1E7;&#x1F1EA;',away:'埃及',af:'&#x1F1EA;&#x1F1EC;',group:'G',rhs:1,ras:1,status:'done'},
-  {id:'m13',date:'6/16',home:'沙特阿拉伯',hf:'&#x1F1F8;&#x1F1E6;',away:'乌拉圭',af:'&#x1F1FA;&#x1F1FE;',group:'H',rhs:1,ras:1,status:'done'},
-  {id:'m13b',date:'6/16',home:'伊朗',hf:'&#x1F1EE;&#x1F1F7;',away:'新西兰',af:'&#x1F1F3;&#x1F1FF;',group:'G',rhs:2,ras:2,status:'done'},
-  {id:'m14',date:'6/16',home:'日本',hf:'&#x1F1EF;&#x1F1F5;',away:'荷兰',af:'&#x1F1F3;&#x1F1F1;',group:'K',rhs:null,ras:null,status:'live'},
-  {id:'m14b',date:'6/16',home:'葡萄牙',hf:'&#x1F1F5;&#x1F1F9;',away:'刚果(金)',af:'&#x1F1E8;&#x1F1E9;',group:'F',rhs:null,ras:null,status:'live'},
-  {id:'m15',date:'6/17',home:'巴西',hf:'&#x1F1E7;&#x1F1F7;',away:'突尼斯',af:'&#x1F1F9;&#x1F1F3;',group:'K',rhs:null,ras:null,status:'upcoming'},
-  {id:'m16',date:'6/17',home:'英格兰',hf:'&#x1F3F4;',away:'克罗地亚',af:'&#x1F1ED;&#x1F1F7;',group:'L',rhs:null,ras:null,status:'upcoming'},
-  {id:'m17',date:'6/18',home:'德国',hf:'&#x1F1E9;&#x1F1EA;',away:'苏格兰',af:'&#x1F3F4;',group:'E',rhs:null,ras:null,status:'upcoming'},
-  {id:'m18',date:'6/18',home:'捷克',hf:'&#x1F1E8;&#x1F1FF;',away:'南非',af:'&#x1F1FF;&#x1F1E6;',group:'A',rhs:null,ras:null,status:'upcoming'},
-  {id:'m19',date:'6/19',home:'阿根廷',hf:'&#x1F1E6;&#x1F1F7;',away:'奥地利',af:'&#x1F1E6;&#x1F1F9;',group:'J',rhs:null,ras:null,status:'upcoming'},
-  {id:'m20',date:'6/20',home:'法国',hf:'&#x1F1EB;&#x1F1F7;',away:'挪威',af:'&#x1F1F3;&#x1F1F4;',group:'I',rhs:null,ras:null,status:'upcoming'},
-  {id:'m21',date:'6/21',home:'西班牙',hf:'&#x1F1EA;&#x1F1F8;',away:'沙特',af:'&#x1F1F8;&#x1F1E6;',group:'H',rhs:null,ras:null,status:'upcoming'},
-  {id:'m22',date:'6/22',home:'巴西',hf:'&#x1F1E7;&#x1F1F7;',away:'荷兰',af:'&#x1F1F3;&#x1F1F1;',group:'K',rhs:null,ras:null,status:'upcoming'},
+  // —— 第1轮（6/11-6/17）——
+  {id:'m1', date:'6/11',home:'墨西哥',hf:'&#x1F1F2;&#x1F1FD;',away:'南非',af:'&#x1F1FF;&#x1F1E6;',group:'A',rhs:2,ras:0,status:'done'},
+  {id:'m2', date:'6/11',home:'韩国',hf:'&#x1F1F0;&#x1F1F7;',away:'捷克',af:'&#x1F1E8;&#x1F1FF;',group:'A',rhs:2,ras:1,status:'done'},
+  {id:'m3', date:'6/12',home:'美国',hf:'&#x1F1FA;&#x1F1F8;',away:'巴拉圭',af:'&#x1F1F5;&#x1F1FE;',group:'D',rhs:4,ras:1,status:'done'},
+  {id:'m4', date:'6/12',home:'加拿大',hf:'&#x1F1E8;&#x1F1E6;',away:'波黑',af:'&#x1F1E7;&#x1F1E6;',group:'B',rhs:1,ras:1,status:'done'},
+  {id:'m5', date:'6/13',home:'澳大利亚',hf:'&#x1F1E6;&#x1F1FA;',away:'土耳其',af:'&#x1F1F9;&#x1F1F7;',group:'D',rhs:2,ras:0,status:'done'},
+  {id:'m6', date:'6/13',home:'巴西',hf:'&#x1F1E7;&#x1F1F7;',away:'摩洛哥',af:'&#x1F1F2;&#x1F1E6;',group:'C',rhs:1,ras:1,status:'done'},
+  {id:'m7', date:'6/13',home:'苏格兰',hf:'&#x1F3F4;',away:'海地',af:'&#x1F1ED;&#x1F1F9;',group:'C',rhs:1,ras:0,status:'done'},
+  {id:'m8', date:'6/13',home:'卡塔尔',hf:'&#x1F1F6;&#x1F1E6;',away:'瑞士',af:'&#x1F1E8;&#x1F1ED;',group:'B',rhs:1,ras:1,status:'done'},
+  {id:'m9', date:'6/14',home:'德国',hf:'&#x1F1E9;&#x1F1EA;',away:'库拉索',af:'&#x1F1E8;&#x1F1FC;',group:'E',rhs:7,ras:1,status:'done'},
+  {id:'m10',date:'6/14',home:'科特迪瓦',hf:'&#x1F1E8;&#x1F1EE;',away:'厄瓜多尔',af:'&#x1F1EA;&#x1F1E8;',group:'E',rhs:1,ras:0,status:'done'},
+  {id:'m11',date:'6/14',home:'荷兰',hf:'&#x1F1F3;&#x1F1F1;',away:'日本',af:'&#x1F1EF;&#x1F1F5;',group:'F',rhs:2,ras:2,status:'done'},
+  {id:'m12',date:'6/14',home:'瑞典',hf:'&#x1F1F8;&#x1F1EA;',away:'突尼斯',af:'&#x1F1F9;&#x1F1F3;',group:'F',rhs:5,ras:1,status:'done'},
+  {id:'m13',date:'6/15',home:'比利时',hf:'&#x1F1E7;&#x1F1EA;',away:'埃及',af:'&#x1F1EA;&#x1F1EC;',group:'G',rhs:1,ras:1,status:'done'},
+  {id:'m14',date:'6/15',home:'伊朗',hf:'&#x1F1EE;&#x1F1F7;',away:'新西兰',af:'&#x1F1F3;&#x1F1FF;',group:'G',rhs:2,ras:2,status:'done'},
+  {id:'m15',date:'6/15',home:'西班牙',hf:'&#x1F1EA;&#x1F1F8;',away:'佛得角',af:'&#x1F1E8;&#x1F1FB;',group:'H',rhs:0,ras:0,status:'done'},
+  {id:'m16',date:'6/15',home:'沙特阿拉伯',hf:'&#x1F1F8;&#x1F1E6;',away:'乌拉圭',af:'&#x1F1FA;&#x1F1FE;',group:'H',rhs:1,ras:1,status:'done'},
+  {id:'m17',date:'6/16',home:'法国',hf:'&#x1F1EB;&#x1F1F7;',away:'塞内加尔',af:'&#x1F1F8;&#x1F1F3;',group:'I',rhs:null,ras:null,status:'upcoming'},
+  {id:'m18',date:'6/16',home:'伊拉克',hf:'&#x1F1EE;&#x1F1F6;',away:'挪威',af:'&#x1F1F3;&#x1F1F4;',group:'I',rhs:null,ras:null,status:'upcoming'},
+  {id:'m19',date:'6/16',home:'阿根廷',hf:'&#x1F1E6;&#x1F1F7;',away:'阿尔及利亚',af:'&#x1F1E9;&#x1F1FF;',group:'J',rhs:null,ras:null,status:'upcoming'},
+  {id:'m20',date:'6/16',home:'奥地利',hf:'&#x1F1E6;&#x1F1F9;',away:'约旦',af:'&#x1F1EF;&#x1F1F4;',group:'J',rhs:null,ras:null,status:'upcoming'},
+  {id:'m21',date:'6/17',home:'葡萄牙',hf:'&#x1F1F5;&#x1F1F9;',away:'刚果(金)',af:'&#x1F1E8;&#x1F1E9;',group:'K',rhs:null,ras:null,status:'upcoming'},
+  {id:'m22',date:'6/17',home:'乌兹别克斯坦',hf:'&#x1F1FA;&#x1F1FF;',away:'哥伦比亚',af:'&#x1F1E8;&#x1F1F4;',group:'K',rhs:null,ras:null,status:'upcoming'},
+  {id:'m23',date:'6/17',home:'英格兰',hf:'&#x1F3F4;',away:'克罗地亚',af:'&#x1F1ED;&#x1F1F7;',group:'L',rhs:null,ras:null,status:'upcoming'},
+  {id:'m24',date:'6/17',home:'加纳',hf:'&#x1F1EC;&#x1F1ED;',away:'巴拿马',af:'&#x1F1F5;&#x1F1E6;',group:'L',rhs:null,ras:null,status:'upcoming'},
+  // —— 第2轮（6/18-6/22）——
+  {id:'m25',date:'6/18',home:'捷克',hf:'&#x1F1E8;&#x1F1FF;',away:'南非',af:'&#x1F1FF;&#x1F1E6;',group:'A',rhs:null,ras:null,status:'upcoming'},
+  {id:'m26',date:'6/18',home:'瑞士',hf:'&#x1F1E8;&#x1F1ED;',away:'波黑',af:'&#x1F1E7;&#x1F1E6;',group:'B',rhs:null,ras:null,status:'upcoming'},
+  {id:'m27',date:'6/18',home:'加拿大',hf:'&#x1F1E8;&#x1F1E6;',away:'卡塔尔',af:'&#x1F1F6;&#x1F1E6;',group:'B',rhs:null,ras:null,status:'upcoming'},
+  {id:'m28',date:'6/18',home:'墨西哥',hf:'&#x1F1F2;&#x1F1FD;',away:'韩国',af:'&#x1F1F0;&#x1F1F7;',group:'A',rhs:null,ras:null,status:'upcoming'},
+  {id:'m29',date:'6/19',home:'美国',hf:'&#x1F1FA;&#x1F1F8;',away:'澳大利亚',af:'&#x1F1E6;&#x1F1FA;',group:'D',rhs:null,ras:null,status:'upcoming'},
+  {id:'m30',date:'6/19',home:'苏格兰',hf:'&#x1F3F4;',away:'摩洛哥',af:'&#x1F1F2;&#x1F1E6;',group:'C',rhs:null,ras:null,status:'upcoming'},
+  {id:'m31',date:'6/19',home:'巴西',hf:'&#x1F1E7;&#x1F1F7;',away:'海地',af:'&#x1F1ED;&#x1F1F9;',group:'C',rhs:null,ras:null,status:'upcoming'},
+  {id:'m32',date:'6/19',home:'土耳其',hf:'&#x1F1F9;&#x1F1F7;',away:'巴拉圭',af:'&#x1F1F5;&#x1F1FE;',group:'D',rhs:null,ras:null,status:'upcoming'},
+  {id:'m33',date:'6/20',home:'荷兰',hf:'&#x1F1F3;&#x1F1F1;',away:'瑞典',af:'&#x1F1F8;&#x1F1EA;',group:'F',rhs:null,ras:null,status:'upcoming'},
+  {id:'m34',date:'6/20',home:'德国',hf:'&#x1F1E9;&#x1F1EA;',away:'科特迪瓦',af:'&#x1F1E8;&#x1F1EE;',group:'E',rhs:null,ras:null,status:'upcoming'},
+  {id:'m35',date:'6/20',home:'厄瓜多尔',hf:'&#x1F1EA;&#x1F1E8;',away:'库拉索',af:'&#x1F1E8;&#x1F1FC;',group:'E',rhs:null,ras:null,status:'upcoming'},
+  {id:'m36',date:'6/20',home:'突尼斯',hf:'&#x1F1F9;&#x1F1F3;',away:'日本',af:'&#x1F1EF;&#x1F1F5;',group:'F',rhs:null,ras:null,status:'upcoming'},
+  {id:'m37',date:'6/21',home:'西班牙',hf:'&#x1F1EA;&#x1F1F8;',away:'沙特阿拉伯',af:'&#x1F1F8;&#x1F1E6;',group:'H',rhs:null,ras:null,status:'upcoming'},
+  {id:'m38',date:'6/21',home:'比利时',hf:'&#x1F1E7;&#x1F1EA;',away:'伊朗',af:'&#x1F1EE;&#x1F1F7;',group:'G',rhs:null,ras:null,status:'upcoming'},
+  {id:'m39',date:'6/21',home:'乌拉圭',hf:'&#x1F1FA;&#x1F1FE;',away:'佛得角',af:'&#x1F1E8;&#x1F1FB;',group:'H',rhs:null,ras:null,status:'upcoming'},
+  {id:'m40',date:'6/21',home:'新西兰',hf:'&#x1F1F3;&#x1F1FF;',away:'埃及',af:'&#x1F1EA;&#x1F1EC;',group:'G',rhs:null,ras:null,status:'upcoming'},
+  {id:'m41',date:'6/22',home:'阿根廷',hf:'&#x1F1E6;&#x1F1F7;',away:'奥地利',af:'&#x1F1E6;&#x1F1F9;',group:'J',rhs:null,ras:null,status:'upcoming'},
+  {id:'m42',date:'6/22',home:'法国',hf:'&#x1F1EB;&#x1F1F7;',away:'伊拉克',af:'&#x1F1EE;&#x1F1F6;',group:'I',rhs:null,ras:null,status:'upcoming'},
+  {id:'m43',date:'6/22',home:'挪威',hf:'&#x1F1F3;&#x1F1F4;',away:'塞内加尔',af:'&#x1F1F8;&#x1F1F3;',group:'I',rhs:null,ras:null,status:'upcoming'},
+  {id:'m44',date:'6/22',home:'约旦',hf:'&#x1F1EF;&#x1F1F4;',away:'阿尔及利亚',af:'&#x1F1E9;&#x1F1FF;',group:'J',rhs:null,ras:null,status:'upcoming'},
 ];
+
+// 中文队名 → openfootball 英文队名（用于自动同步真实比分）
+const TEAM_EN = {
+  '墨西哥':'Mexico','南非':'South Africa','韩国':'South Korea','捷克':'Czech Republic',
+  '美国':'USA','巴拉圭':'Paraguay','加拿大':'Canada','波黑':'Bosnia & Herzegovina',
+  '澳大利亚':'Australia','土耳其':'Turkey','巴西':'Brazil','摩洛哥':'Morocco',
+  '苏格兰':'Scotland','海地':'Haiti','卡塔尔':'Qatar','瑞士':'Switzerland',
+  '德国':'Germany','库拉索':'Curaçao','科特迪瓦':'Ivory Coast','厄瓜多尔':'Ecuador',
+  '荷兰':'Netherlands','日本':'Japan','瑞典':'Sweden','突尼斯':'Tunisia',
+  '比利时':'Belgium','埃及':'Egypt','伊朗':'Iran','新西兰':'New Zealand',
+  '西班牙':'Spain','佛得角':'Cape Verde','沙特阿拉伯':'Saudi Arabia','乌拉圭':'Uruguay',
+  '法国':'France','塞内加尔':'Senegal','伊拉克':'Iraq','挪威':'Norway',
+  '阿根廷':'Argentina','阿尔及利亚':'Algeria','奥地利':'Austria','约旦':'Jordan',
+  '葡萄牙':'Portugal','刚果(金)':'DR Congo','乌兹别克斯坦':'Uzbekistan','哥伦比亚':'Colombia',
+  '英格兰':'England','克罗地亚':'Croatia','加纳':'Ghana','巴拿马':'Panama'
+};
+
+// 从公开数据源自动同步真实比分（openfootball，经 jsDelivr CDN，国内可访问、无需密钥）
+// 数据约每日更新；同步失败时保留内置数据，不影响使用
+const SCORE_FEED = 'https://cdn.jsdelivr.net/gh/openfootball/worldcup.json@master/2026/worldcup.json';
+async function syncRealScores() {
+  const note = document.getElementById('sync-note');
+  try {
+    const r = await fetchTimeout(SCORE_FEED, {}, 8000);
+    if (!r.ok) throw new Error('feed ' + r.status);
+    const data = await r.json();
+    const feed = {};
+    (data.matches || []).forEach(fm => {
+      const ft = fm.score && fm.score.ft;
+      if (Array.isArray(ft) && ft.length === 2) feed[fm.team1 + '|' + fm.team2] = ft;
+    });
+    let changed = 0;
+    matches.forEach(m => {
+      const en1 = TEAM_EN[m.home], en2 = TEAM_EN[m.away];
+      if (!en1 || !en2) return;
+      let ft = feed[en1 + '|' + en2], swap = false;
+      if (!ft) { ft = feed[en2 + '|' + en1]; swap = !!ft; }
+      if (!ft) return;
+      const h = swap ? ft[1] : ft[0], a = swap ? ft[0] : ft[1];
+      if (m.rhs !== h || m.ras !== a || m.status !== 'done') {
+        m.rhs = h; m.ras = a; m.status = 'done'; changed++;
+      }
+    });
+    if (changed > 0) { renderMatches(); }
+    if (note) note.textContent = '⚽ 比分已同步真实数据 · ' + new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) + ' 更新';
+  } catch (e) {
+    if (note) note.textContent = '⚽ 比分为内置数据（实时同步暂不可用）';
+  }
+}
 
 const champTeams = [
   {n:'阿根廷',f:'&#x1F1E6;&#x1F1F7;'},{n:'法国',f:'&#x1F1EB;&#x1F1F7;'},{n:'巴西',f:'&#x1F1E7;&#x1F1F7;'},{n:'英格兰',f:'&#x1F3F4;'},
@@ -393,6 +490,9 @@ function goToMain(name) {
   renderMatches(); renderChampion(); renderMyPicks();
   // 后台拉取大家的预测和留言，回来后刷新赛程
   loadSocialData().then(renderMatches);
+  // 自动同步真实比分，并每 5 分钟刷新一次
+  syncRealScores();
+  if (!window._scoreTimer) window._scoreTimer = setInterval(syncRealScores, 5 * 60 * 1000);
 }
 
 window.changeUser = function() {
@@ -654,6 +754,25 @@ function renderMyPicks() {
       + '<span class="pick-result">' + icon + '</span></div>';
   }).join('');
 }
+
+// ── 开屏球星滚动条 ──
+const stars = [
+  { f: '&#x1F1E6;&#x1F1F7;', num: 10, name: '梅西' },
+  { f: '&#x1F1EB;&#x1F1F7;', num: 10, name: '姆巴佩' },
+  { f: '&#x1F1E7;&#x1F1F7;', num: 7,  name: '维尼修斯' },
+  { f: '&#x1F1F3;&#x1F1F4;', num: 9,  name: '哈兰德' },
+  { f: '&#x1F3F4;',          num: 10, name: '贝林厄姆' },
+  { f: '&#x1F1EA;&#x1F1F8;', num: 19, name: '亚马尔' },
+  { f: '&#x1F1F5;&#x1F1F9;', num: 7,  name: 'C罗' },
+  { f: '&#x1F1F3;&#x1F1F1;', num: 4,  name: '范戴克' },
+];
+(function renderStars() {
+  const track = document.getElementById('star-track');
+  if (!track) return;
+  const chip = s => '<div class="star-chip"><span class="num">' + s.num + '</span><span class="sflag">' + s.f + '</span><span class="sname">' + s.name + '</span></div>';
+  // 列表渲染两遍，配合 translateX(-50%) 实现无缝循环
+  track.innerHTML = stars.map(chip).join('') + stars.map(chip).join('');
+})();
 
 // ── 自动登录 ──
 const savedName = localStorage.getItem('wc_nickname');
