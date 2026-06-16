@@ -115,6 +115,31 @@ header { background: var(--green); color: white; position: sticky; top: 0; z-ind
 .empty { text-align: center; padding: 3rem 1rem; color: var(--text-muted); font-size: 14px; line-height: 1.8; }
 .toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 8px 20px; border-radius: 20px; font-size: 13px; opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 999; white-space: nowrap; }
 .toast.show { opacity: 1; }
+.social { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 6px; }
+.social > summary { list-style: none; cursor: pointer; font-size: 12px; color: var(--text-muted); text-align: center; padding: 5px; user-select: none; }
+.social > summary::-webkit-details-marker { display: none; }
+.social > summary:hover { color: var(--green); }
+.social[open] > summary { color: var(--green); font-weight: 600; }
+.social-body { padding-top: 10px; }
+.vote-bar { display: flex; height: 26px; border-radius: 6px; overflow: hidden; margin-bottom: 6px; }
+.vote-seg { display: flex; align-items: center; justify-content: center; color: white; font-size: 11px; font-weight: 700; min-width: 18px; }
+.vote-seg.home { background: var(--blue); }
+.vote-seg.draw { background: var(--gray); }
+.vote-seg.away { background: var(--red); }
+.vote-legend { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-bottom: 10px; gap: 4px; }
+.watch-list { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+.watch-item { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 6px 10px; background: var(--gray-light); border-radius: 6px; }
+.watch-item .wname { flex: 1; }
+.watch-item .wscore { font-weight: 700; color: var(--blue); }
+.locked { text-align: center; font-size: 12px; color: var(--text-muted); padding: 12px; background: var(--gray-light); border-radius: 6px; margin-bottom: 12px; }
+.cmt-list { display: flex; flex-direction: column; gap: 7px; margin-bottom: 8px; }
+.cmt { font-size: 13px; line-height: 1.4; word-break: break-word; }
+.cmt b { color: var(--green); margin-right: 5px; }
+.cmt-empty { font-size: 12px; color: var(--text-muted); text-align: center; padding: 6px; }
+.cmt-form { display: flex; gap: 6px; }
+.cmt-input { flex: 1; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; outline: none; min-width: 0; }
+.cmt-input:focus { border-color: var(--green); }
+.cmt-send { padding: 8px 14px; border: none; background: var(--green); color: white; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
 @media (max-width: 380px) { #champ-grid { grid-template-columns: repeat(3, 1fr); } .team-name { font-size: 12px; } }
 </style>
 </head>
@@ -236,6 +261,27 @@ async function dbListAll() {
   return r.json();
 }
 
+async function dbGetAllComments() {
+  const r = await fetchTimeout(
+    SUPA_URL + '/rest/v1/comments?select=*&order=created_at.asc',
+    { headers: SUPA_HEADERS }
+  );
+  if (!r.ok) throw new Error('评论加载失败 ' + r.status);
+  return r.json();
+}
+
+async function dbAddComment(matchId, nickname, text) {
+  const r = await fetchTimeout(
+    SUPA_URL + '/rest/v1/comments',
+    {
+      method: 'POST',
+      headers: { ...SUPA_HEADERS, 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ match_id: matchId, nickname, text })
+    }
+  );
+  if (!r.ok) throw new Error('发送失败 ' + r.status);
+}
+
 // ── 赛程数据 ──
 const matches = [
   {id:'m1',date:'6/11',home:'墨西哥',hf:'&#x1F1F2;&#x1F1FD;',away:'南非',af:'&#x1F1FF;&#x1F1E6;',group:'A',rhs:2,ras:0,status:'done'},
@@ -270,6 +316,42 @@ const champTeams = [
 
 // ── 状态 ──
 let currentUser = null, userPreds = {}, userChampion = null, currentFilter = 'all';
+let allPredsCache = null, commentsCache = {};
+
+// 防 XSS：留言/昵称里的特殊字符转义
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+// 加载社交数据：所有人的预测 + 所有留言（两者互不影响，任一失败不拖累另一个）
+async function loadSocialData() {
+  try {
+    const rows = await dbListAll();
+    allPredsCache = rows.map(r => {
+      let p = {};
+      try { p = JSON.parse(r.predictions) || {}; } catch {}
+      return { nickname: r.nickname, preds: p };
+    });
+  } catch (e) { /* 预测加载失败保留旧缓存 */ }
+  try {
+    const cmts = await dbGetAllComments();
+    commentsCache = {};
+    cmts.forEach(c => { (commentsCache[c.match_id] = commentsCache[c.match_id] || []).push(c); });
+  } catch (e) { /* 留言表不存在或加载失败，留言区留空 */ }
+}
+
+// 按比赛聚合所有人的预测
+function matchAgg(mid) {
+  const list = []; let home = 0, draw = 0, away = 0;
+  (allPredsCache || []).forEach(u => {
+    const p = u.preds[mid];
+    if (!p || typeof p.h !== 'number' || typeof p.a !== 'number') return;
+    list.push({ name: u.nickname, h: p.h, a: p.a });
+    const o = getOutcome(p.h, p.a);
+    if (o === 'home') home++; else if (o === 'draw') draw++; else away++;
+  });
+  return { list, home, draw, away, total: list.length };
+}
 
 // ── 算分 ──
 function getOutcome(h, a) { return h > a ? 'home' : a > h ? 'away' : 'draw'; }
@@ -309,6 +391,8 @@ function goToMain(name) {
   document.getElementById('main-screen').classList.add('active');
   document.getElementById('header-user').textContent = '👤 ' + name;
   renderMatches(); renderChampion(); renderMyPicks();
+  // 后台拉取大家的预测和留言，回来后刷新赛程
+  loadSocialData().then(renderMatches);
 }
 
 window.changeUser = function() {
@@ -341,6 +425,7 @@ window.showTab = function(t, btn) {
   document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
   document.getElementById('tab-' + t).classList.add('active');
   btn.classList.add('active');
+  if (t === 'matches') loadSocialData().then(renderMatches);
   if (t === 'leaderboard') renderLeaderboard();
   if (t === 'mypicks') renderMyPicks();
   if (t === 'champion') renderChampion();
@@ -351,6 +436,80 @@ window.filterMatches = function(f, btn) {
   document.querySelectorAll('.filter-btn').forEach(el => el.classList.remove('active'));
   btn.classList.add('active');
   renderMatches();
+};
+
+// ── 渲染：单场社交区（围观预测 + 氛围统计 + 留言）──
+function renderSocialSection(m) {
+  const started = m.status === 'live' || m.status === 'done';
+  const agg = matchAgg(m.id);
+  const cmts = commentsCache[m.id] || [];
+  const hasFinal = m.rhs !== null && m.ras !== null;
+
+  let body = '<div class="social-body">';
+
+  // 预测揭晓 / 氛围统计
+  if (!started) {
+    body += '<div class="locked">&#x1F512; 开赛后揭晓大家的预测（已有 ' + agg.total + ' 人预测）</div>';
+  } else if (agg.total > 0) {
+    body += '<div class="vote-bar">'
+      + (agg.home ? '<div class="vote-seg home" style="flex:' + agg.home + '">' + agg.home + '</div>' : '')
+      + (agg.draw ? '<div class="vote-seg draw" style="flex:' + agg.draw + '">' + agg.draw + '</div>' : '')
+      + (agg.away ? '<div class="vote-seg away" style="flex:' + agg.away + '">' + agg.away + '</div>' : '')
+      + '</div>'
+      + '<div class="vote-legend"><span>&#x1F535; ' + m.home + '赢 ' + agg.home + '</span><span>&#x26AA; 平 ' + agg.draw + '</span><span>&#x1F534; ' + m.away + '赢 ' + agg.away + '</span></div>'
+      + '<div class="watch-list">' + agg.list.map(p => {
+          let icon = '';
+          if (hasFinal) {
+            if (p.h === m.rhs && p.a === m.ras) icon = '&#x1F3AF;';
+            else if (getOutcome(p.h, p.a) === getOutcome(m.rhs, m.ras)) icon = '&#x2705;';
+            else icon = '&#x274C;';
+          }
+          const me = p.name === currentUser ? ' &#x1F448;' : '';
+          return '<div class="watch-item"><span class="wname">' + escapeHtml(p.name) + me + '</span><span class="wscore">' + p.h + ':' + p.a + '</span><span>' + icon + '</span></div>';
+        }).join('') + '</div>';
+  } else {
+    body += '<div class="locked">还没有人预测这场</div>';
+  }
+
+  // 留言墙
+  body += '<div class="cmt-list" id="cmt-list-' + m.id + '">';
+  if (cmts.length) {
+    body += cmts.map(c => '<div class="cmt"><b>' + escapeHtml(c.nickname) + '</b>' + escapeHtml(c.text) + '</div>').join('');
+  } else {
+    body += '<div class="cmt-empty">还没人聊，来说两句 &#x1F447;</div>';
+  }
+  body += '</div>'
+    + '<div class="cmt-form"><input class="cmt-input" id="cmt-input-' + m.id + '" maxlength="80" placeholder="说点什么...">'
+    + '<button class="cmt-send" onclick="submitComment(\'' + m.id + '\')">发送</button></div>';
+
+  body += '</div>';
+
+  return '<details class="social"><summary>&#x1F465; 大家的预测 (' + agg.total + ') · &#x1F4AC; ' + cmts.length + '</summary>' + body + '</details>';
+}
+
+window.submitComment = async function(mid) {
+  const input = document.getElementById('cmt-input-' + mid);
+  const text = input.value.trim();
+  if (!text) { input.focus(); return; }
+  input.disabled = true;
+  try {
+    await dbAddComment(mid, currentUser, text);
+    (commentsCache[mid] = commentsCache[mid] || []).push({ match_id: mid, nickname: currentUser, text });
+    const listEl = document.getElementById('cmt-list-' + mid);
+    const empty = listEl.querySelector('.cmt-empty');
+    if (empty) empty.remove();
+    const div = document.createElement('div');
+    div.className = 'cmt';
+    div.innerHTML = '<b>' + escapeHtml(currentUser) + '</b>' + escapeHtml(text);
+    listEl.appendChild(div);
+    input.value = '';
+    showToast('已发送');
+  } catch (e) {
+    showToast('发送失败，请重试');
+  } finally {
+    input.disabled = false;
+    input.focus();
+  }
 };
 
 // ── 渲染：赛程 ──
@@ -398,7 +557,7 @@ function renderMatches() {
       + '<div class="team"><span class="flag">' + m.hf + '</span><span class="team-name">' + m.home + '</span></div>'
       + '<div class="score-box">' + scoreHTML + '</div>'
       + '<div class="team right"><span class="team-name">' + m.away + '</span><span class="flag">' + m.af + '</span></div>'
-      + '</div>' + predHTML + '</div>';
+      + '</div>' + predHTML + renderSocialSection(m) + '</div>';
   }).join('');
 }
 
