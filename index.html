@@ -18,7 +18,8 @@
 body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif; background: #f0f4f0; color: var(--text); min-height: 100vh; }
 .screen { display: none; }
 .screen.active { display: block; }
-#login-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #1a4a2e 0%, #2d7a4f 50%, #1a8a4a 100%); padding: 2rem; }
+#login-screen { min-height: 100vh; align-items: center; justify-content: center; background: linear-gradient(135deg, #1a4a2e 0%, #2d7a4f 50%, #1a8a4a 100%); padding: 2rem; }
+#login-screen.active { display: flex; }
 .login-box { background: white; border-radius: 20px; padding: 2.5rem 2rem; text-align: center; width: 100%; max-width: 380px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
 .login-emoji { font-size: 56px; margin-bottom: 1rem; }
 .login-box h1 { font-size: 24px; font-weight: 700; line-height: 1.3; margin-bottom: .75rem; }
@@ -188,8 +189,19 @@ const SUPA_HEADERS = {
   'Content-Type': 'application/json'
 };
 
+// 带超时的 fetch：超过 8 秒自动放弃，绝不无限挂起
+async function fetchTimeout(url, opts = {}, ms = 8000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { ...opts, signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function dbGet(nickname) {
-  const r = await fetch(
+  const r = await fetchTimeout(
     SUPA_URL + '/rest/v1/predictions?nickname=eq.' + encodeURIComponent(nickname) + '&select=*',
     { headers: SUPA_HEADERS }
   );
@@ -199,7 +211,7 @@ async function dbGet(nickname) {
 }
 
 async function dbSave(nickname, predictions, champion) {
-  const r = await fetch(
+  const r = await fetchTimeout(
     SUPA_URL + '/rest/v1/predictions',
     {
       method: 'POST',
@@ -216,7 +228,7 @@ async function dbSave(nickname, predictions, champion) {
 }
 
 async function dbListAll() {
-  const r = await fetch(
+  const r = await fetchTimeout(
     SUPA_URL + '/rest/v1/predictions?select=*',
     { headers: SUPA_HEADERS }
   );
@@ -308,21 +320,19 @@ window.changeUser = function() {
   document.getElementById('nickname-input').value = '';
 };
 
-window.enterApp = async function() {
+window.enterApp = function() {
   const input = document.getElementById('nickname-input');
   const name = input.value.trim();
   if (!name || name.length < 2) { input.focus(); input.style.borderColor = '#e24b4a'; return; }
   input.style.borderColor = '';
-  const btn = document.getElementById('login-btn');
-  btn.textContent = '加载中...'; btn.disabled = true;
   localStorage.setItem('wc_nickname', name);
   currentUser = name;
-  try {
-    await loadUserData();
-  } catch (e) {
-    showToast('云端加载失败，以空数据进入');
-  }
+  // 立刻进入 app，绝不等待网络
   goToMain(name);
+  // 后台加载云端数据，成功后刷新界面
+  loadUserData()
+    .then(() => { renderMatches(); renderChampion(); renderMyPicks(); })
+    .catch(() => showToast('云端数据加载失败，已用空白进入'));
 };
 
 // ── Tab 切换 ──
@@ -490,9 +500,11 @@ function renderMyPicks() {
 const savedName = localStorage.getItem('wc_nickname');
 if (savedName) {
   currentUser = savedName;
+  // 立刻进入，后台再补数据
+  goToMain(savedName);
   loadUserData()
-    .then(() => goToMain(savedName))
-    .catch(() => goToMain(savedName));
+    .then(() => { renderMatches(); renderChampion(); renderMyPicks(); })
+    .catch(() => {});
 }
 </script>
 </body>
