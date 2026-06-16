@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>⚽ 世界杯2026 比分预测</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- 登录界面 -->
+  <div id="login-screen" class="screen active">
+    <div class="login-box">
+      <div class="login-emoji">⚽</div>
+      <h1>世界杯2026<br>比分预测挑战</h1>
+      <p class="login-sub">和朋友一起预测，赛后看谁猜得最准！</p>
+      <input id="nickname-input" type="text" placeholder="输入你的昵称" maxlength="12">
+      <button id="login-btn" onclick="enterApp()">进入预测 →</button>
+      <p class="login-hint">昵称将作为你的身份标识，填完后不能修改</p>
+    </div>
+  </div>
+
+  <!-- 主界面 -->
+  <div id="main-screen" class="screen">
+    <header>
+      <div class="header-inner">
+        <span class="header-title">⚽ 世界杯2026</span>
+        <span id="header-user" class="header-user"></span>
+      </div>
+    </header>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="showTab('matches', this)">📅 赛程</button>
+      <button class="tab-btn" onclick="showTab('leaderboard', this)">🏆 排行</button>
+      <button class="tab-btn" onclick="showTab('champion', this)">👑 冠军</button>
+      <button class="tab-btn" onclick="showTab('mypicks', this)">🎯 我的</button>
+    </div>
+
+    <div class="content">
+
+      <!-- 赛程预测 -->
+      <div id="tab-matches" class="tab-content active">
+        <div class="filter-row">
+          <button class="filter-btn active" onclick="filterMatches('all', this)">全部</button>
+          <button class="filter-btn" onclick="filterMatches('live', this)">🔴 进行中</button>
+          <button class="filter-btn" onclick="filterMatches('upcoming', this)">即将开始</button>
+          <button class="filter-btn" onclick="filterMatches('done', this)">已结束</button>
+        </div>
+        <div id="matches-list"></div>
+      </div>
+
+      <!-- 排行榜 -->
+      <div id="tab-leaderboard" class="tab-content">
+        <div class="leaderboard-header">
+          <div class="scoring-rules">
+            <span>🎯 完全猜中比分 <b>+3分</b></span>
+            <span>✅ 猜中胜负 <b>+1分</b></span>
+          </div>
+        </div>
+        <div id="leaderboard-list"><div class="loading">加载中...</div></div>
+      </div>
+
+      <!-- 冠军竞猜 -->
+      <div id="tab-champion" class="tab-content">
+        <div class="champ-intro">
+          <p>你觉得谁会举起大力神杯？</p>
+          <div id="my-champ-display"></div>
+        </div>
+        <div id="champ-grid"></div>
+      </div>
+
+      <!-- 我的预测 -->
+      <div id="tab-mypicks" class="tab-content">
+        <div class="stats-row" id="my-stats"></div>
+        <div id="my-picks-list"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
