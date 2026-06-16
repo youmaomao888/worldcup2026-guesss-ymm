@@ -27,12 +27,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif
 #nickname-input:focus { border-color: var(--green); }
 #login-btn { width: 100%; padding: 14px; background: var(--green); color: white; border: none; border-radius: var(--radius); font-size: 16px; font-weight: 600; cursor: pointer; }
 #login-btn:hover { background: #157a3e; }
-#login-btn:disabled { opacity: .7; }
+#login-btn:disabled { opacity: .7; cursor: not-allowed; }
 .login-hint { font-size: 12px; color: #9ca3af; margin-top: 12px; }
 header { background: var(--green); color: white; position: sticky; top: 0; z-index: 100; }
 .header-inner { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; max-width: 600px; margin: 0 auto; }
 .header-title { font-size: 16px; font-weight: 600; }
-.header-user { font-size: 13px; background: rgba(255,255,255,0.2); padding: 4px 10px; border-radius: 20px; }
+.header-user { font-size: 13px; background: rgba(255,255,255,0.2); padding: 4px 10px; border-radius: 20px; cursor: pointer; }
 .tab-bar { display: flex; background: white; border-bottom: 1px solid var(--border); position: sticky; top: 49px; z-index: 99; max-width: 600px; margin: 0 auto; }
 .tab-btn { flex: 1; padding: 12px 4px; border: none; background: transparent; font-size: 13px; color: var(--text-muted); cursor: pointer; border-bottom: 2.5px solid transparent; font-weight: 500; }
 .tab-btn.active { color: var(--green); border-bottom-color: var(--green); }
@@ -112,6 +112,8 @@ header { background: var(--green); color: white; position: sticky; top: 0; z-ind
 .pick-result { font-size: 18px; }
 .loading { text-align: center; padding: 2rem; color: var(--text-muted); font-size: 14px; }
 .empty { text-align: center; padding: 3rem 1rem; color: var(--text-muted); font-size: 14px; line-height: 1.8; }
+.toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 8px 20px; border-radius: 20px; font-size: 13px; opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 999; white-space: nowrap; }
+.toast.show { opacity: 1; }
 @media (max-width: 380px) { #champ-grid { grid-template-columns: repeat(3, 1fr); } .team-name { font-size: 12px; } }
 </style>
 </head>
@@ -122,9 +124,9 @@ header { background: var(--green); color: white; position: sticky; top: 0; z-ind
     <div class="login-emoji">&#x26BD;</div>
     <h1>世界杯2026<br>比分预测挑战</h1>
     <p class="login-sub">和朋友一起预测，赛后看谁猜得最准！</p>
-    <input id="nickname-input" type="text" placeholder="输入你的昵称" maxlength="12">
+    <input id="nickname-input" type="text" placeholder="输入你的昵称（2-10字）" maxlength="10">
     <button id="login-btn" onclick="enterApp()">进入预测 →</button>
-    <p class="login-hint">昵称将作为你的身份标识，填完后不能修改</p>
+    <p class="login-hint">昵称是你的身份标识，同设备下次自动登录</p>
   </div>
 </div>
 
@@ -132,7 +134,7 @@ header { background: var(--green); color: white; position: sticky; top: 0; z-ind
   <header>
     <div class="header-inner">
       <span class="header-title">&#x26BD; 世界杯2026</span>
-      <span id="header-user" class="header-user"></span>
+      <span id="header-user" class="header-user" onclick="changeUser()" title="点击切换用户">&#x1F464; </span>
     </div>
   </header>
   <div class="tab-bar">
@@ -174,6 +176,8 @@ header { background: var(--green); color: white; position: sticky; top: 0; z-ind
   </div>
 </div>
 
+<div id="toast" class="toast"></div>
+
 <script>
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyBFhOCXBRbZSB5as_lDcdsyTB9pHyQnAks",
@@ -184,10 +188,9 @@ const BASE_URL = "https://firestore.googleapis.com/v1/projects/" + FIREBASE_CONF
 async function fsGet(path) {
   const r = await fetch(BASE_URL + "/" + path + "?key=" + FIREBASE_CONFIG.apiKey);
   if (r.status === 404) return null;
-  if (!r.ok) throw new Error("GET failed " + r.status);
+  if (!r.ok) throw new Error("GET " + r.status);
   return r.json();
 }
-
 async function fsSet(path, data) {
   const fields = {};
   for (const [k, v] of Object.entries(data)) {
@@ -196,21 +199,18 @@ async function fsSet(path, data) {
     else if (typeof v === "object" && v !== null) fields[k] = { stringValue: JSON.stringify(v) };
   }
   const r = await fetch(BASE_URL + "/" + path + "?key=" + FIREBASE_CONFIG.apiKey, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    method: "PATCH", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ fields })
   });
-  if (!r.ok) throw new Error("SET failed " + r.status);
+  if (!r.ok) throw new Error("SET " + r.status);
   return r.json();
 }
-
 async function fsList(collection) {
   const r = await fetch(BASE_URL + "/" + collection + "?key=" + FIREBASE_CONFIG.apiKey);
-  if (!r.ok) throw new Error("LIST failed " + r.status);
+  if (!r.ok) throw new Error("LIST " + r.status);
   const data = await r.json();
   return data.documents || [];
 }
-
 function parseDoc(doc) {
   if (!doc || !doc.fields) return {};
   const result = {};
@@ -256,197 +256,238 @@ const champTeams = [
 
 let currentUser = null, userPreds = {}, userChampion = null, currentFilter = 'all';
 
-function getOutcome(h,a){ return h>a?'home':a>h?'away':'draw'; }
-function calcScore(preds){
-  let exact=0,correct=0;
-  matches.forEach(m=>{
-    const p=preds[m.id];
-    if(!p||m.rhs===null||m.ras===null)return;
-    if(p.h===m.rhs&&p.a===m.ras)exact++;
-    else if(getOutcome(p.h,p.a)===getOutcome(m.rhs,m.ras))correct++;
+function getOutcome(h, a) { return h > a ? 'home' : a > h ? 'away' : 'draw'; }
+function calcScore(preds) {
+  let exact = 0, correct = 0;
+  matches.forEach(m => {
+    const p = preds[m.id];
+    if (!p || m.rhs === null || m.ras === null) return;
+    if (p.h === m.rhs && p.a === m.ras) exact++;
+    else if (getOutcome(p.h, p.a) === getOutcome(m.rhs, m.ras)) correct++;
   });
-  return{exact,correct,total:exact*3+correct};
+  return { exact, correct, total: exact * 3 + correct };
 }
 
-async function loadUserData(){
-  try{
-    const doc = await fsGet("users/" + currentUser);
-    if(doc){
-      const data = parseDoc(doc);
-      userPreds = (typeof data.predictions === 'object' && data.predictions !== null) ? data.predictions : {};
-      userChampion = data.champion || null;
-    }
-  }catch(e){ console.error('读取失败',e); }
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
 }
 
-async function saveUserData(){
-  try{
-    await fsSet("users/" + currentUser, {
-      nickname: currentUser,
-      predictions: JSON.stringify(userPreds),
-      champion: userChampion || '',
-      updatedAt: Date.now()
-    });
-  }catch(e){ console.error('保存失败',e); alert('保存失败，请检查网络'); }
+async function loadUserData() {
+  const doc = await fsGet("users/" + encodeURIComponent(currentUser));
+  if (doc) {
+    const data = parseDoc(doc);
+    userPreds = (typeof data.predictions === 'object' && data.predictions !== null) ? data.predictions : {};
+    userChampion = typeof data.champion === 'string' ? data.champion : null;
+  }
+}
+async function saveUserData() {
+  await fsSet("users/" + encodeURIComponent(currentUser), {
+    nickname: currentUser,
+    predictions: JSON.stringify(userPreds),
+    champion: userChampion || '',
+    updatedAt: Date.now()
+  });
 }
 
-function goToMain(name){
+function goToMain(name) {
   document.getElementById('login-screen').classList.remove('active');
   document.getElementById('main-screen').classList.add('active');
   document.getElementById('header-user').textContent = '👤 ' + name;
   renderMatches(); renderChampion(); renderMyPicks();
 }
 
-window.enterApp = async function(){
+window.changeUser = function() {
+  if (!confirm('切换用户？当前预测数据已保存在云端，下次用相同昵称登录可恢复。')) return;
+  localStorage.removeItem('wc_nickname');
+  currentUser = null; userPreds = {}; userChampion = null;
+  document.getElementById('main-screen').classList.remove('active');
+  document.getElementById('login-screen').classList.add('active');
+  document.getElementById('nickname-input').value = '';
+};
+
+window.enterApp = async function() {
   const input = document.getElementById('nickname-input');
   const name = input.value.trim();
-  if(!name||name.length<2){ input.focus(); input.style.borderColor='#e24b4a'; return; }
+  if (!name || name.length < 2) { input.focus(); input.style.borderColor = '#e24b4a'; return; }
+  input.style.borderColor = '';
   const btn = document.getElementById('login-btn');
-  btn.textContent='进入中...'; btn.disabled=true;
-  localStorage.setItem('wc_nickname', name);
-  currentUser = name;
-  await loadUserData();
-  goToMain(name);
+  btn.textContent = '加载中...'; btn.disabled = true;
+  try {
+    localStorage.setItem('wc_nickname', name);
+    currentUser = name;
+    await loadUserData();
+    goToMain(name);
+  } catch (e) {
+    showToast('网络错误，请检查连接后重试');
+    btn.textContent = '进入预测 →'; btn.disabled = false;
+  }
 };
 
-window.showTab = function(t,btn){
-  document.querySelectorAll('.tab-content').forEach(el=>el.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(el=>el.classList.remove('active'));
-  document.getElementById('tab-'+t).classList.add('active');
+window.showTab = function(t, btn) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + t).classList.add('active');
   btn.classList.add('active');
-  if(t==='leaderboard') renderLeaderboard();
-  if(t==='mypicks') renderMyPicks();
-  if(t==='champion') renderChampion();
+  if (t === 'leaderboard') renderLeaderboard();
+  if (t === 'mypicks') renderMyPicks();
+  if (t === 'champion') renderChampion();
 };
 
-window.filterMatches = function(f,btn){
-  currentFilter=f;
-  document.querySelectorAll('.filter-btn').forEach(el=>el.classList.remove('active'));
+window.filterMatches = function(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(el => el.classList.remove('active'));
   btn.classList.add('active');
   renderMatches();
 };
 
-function renderMatches(){
-  const list = matches.filter(m=>currentFilter==='all'||m.status===currentFilter);
+function renderMatches() {
+  const list = matches.filter(m => currentFilter === 'all' || m.status === currentFilter);
   const c = document.getElementById('matches-list');
-  if(!list.length){c.innerHTML='<div class="empty">暂无比赛</div>';return;}
-  c.innerHTML = list.map(m=>{
+  if (!list.length) { c.innerHTML = '<div class="empty">暂无比赛</div>'; return; }
+  c.innerHTML = list.map(m => {
     const pred = userPreds[m.id];
-    const hasFinal = m.rhs!==null&&m.ras!==null;
-    let scoreHTML = m.status==='done'&&hasFinal
-      ? '<div class="real-score">'+m.rhs+':'+m.ras+'</div>'
-      : m.status==='live'
+    const hasFinal = m.rhs !== null && m.ras !== null;
+    let scoreHTML = m.status === 'done' && hasFinal
+      ? '<div class="real-score">' + m.rhs + ':' + m.ras + '</div>'
+      : m.status === 'live'
       ? '<div class="real-score live">?:?</div><div style="font-size:10px;color:#e24b4a;margin-top:3px">&#x1F534; 进行中</div>'
       : '<div class="vs">VS</div>';
-    let metaBadges = '<span class="badge badge-group">组'+m.group+'</span>';
-    if(m.status==='live') metaBadges += '<span class="badge badge-live">&#x1F534; 进行中</span>';
-    if(m.status==='done') metaBadges += '<span class="badge badge-done">已结束</span>';
+    let metaBadges = '<span class="badge badge-group">组' + m.group + '</span>';
+    if (m.status === 'live') metaBadges += '<span class="badge badge-live">&#x1F534; 进行中</span>';
+    if (m.status === 'done') metaBadges += '<span class="badge badge-done">已结束</span>';
     let predHTML = '';
-    if(m.status==='done'){
-      if(pred){
-        const exact = hasFinal&&pred.h===m.rhs&&pred.a===m.ras;
-        const res = hasFinal&&getOutcome(pred.h,pred.a)===getOutcome(m.rhs,m.ras);
-        predHTML = '<div class="pred-section"><div class="pred-display"><div class="pred-score">'+pred.h+':'+pred.a+'</div><div class="pred-note">你的预测</div></div>'
-          +(hasFinal?(exact?'<div class="result-badge exact">&#x1F3AF; 完全猜中！+3分</div>':res?'<div class="result-badge correct">&#x2705; 猜中胜负 +1分</div>':'<div class="result-badge wrong">&#x274C; 没猜中，继续加油</div>'):'')
-          +'</div>';
+    if (m.status === 'done') {
+      if (pred) {
+        const exact = hasFinal && pred.h === m.rhs && pred.a === m.ras;
+        const res = hasFinal && getOutcome(pred.h, pred.a) === getOutcome(m.rhs, m.ras);
+        predHTML = '<div class="pred-section"><div class="pred-display"><div class="pred-score">' + pred.h + ':' + pred.a + '</div><div class="pred-note">你的预测</div></div>'
+          + (hasFinal ? (exact ? '<div class="result-badge exact">&#x1F3AF; 完全猜中！+3分</div>' : res ? '<div class="result-badge correct">&#x2705; 猜中胜负 +1分</div>' : '<div class="result-badge wrong">&#x274C; 没猜中，继续加油</div>') : '')
+          + '</div>';
+      } else {
+        predHTML = '<div class="pred-section"><div class="pred-display" style="background:var(--gray-light)"><div class="pred-note" style="color:var(--text-muted)">未预测此场</div></div></div>';
       }
     } else {
       const saved = !!pred;
       predHTML = '<div class="pred-section"><div class="pred-label">&#x1F3AF; 预测比分</div>'
-        +'<div class="score-input-row">'
-        +'<input class="score-input" id="ph-'+m.id+'" type="number" min="0" max="20" value="'+(pred?pred.h:'')+'" placeholder="0">'
-        +'<span class="score-colon">:</span>'
-        +'<input class="score-input" id="pa-'+m.id+'" type="number" min="0" max="20" value="'+(pred?pred.a:'')+'" placeholder="0">'
-        +'</div>'
-        +'<button class="save-btn '+(saved?'saved':'')+'" id="savebtn-'+m.id+'" onclick="savePred(\''+m.id+'\')">'
-        +(saved?'&#x2705; 已保存，点击修改':'确认预测')
-        +'</button></div>';
+        + '<div class="score-input-row">'
+        + '<input class="score-input" id="ph-' + m.id + '" type="number" min="0" max="20" value="' + (pred ? pred.h : '') + '" placeholder="0">'
+        + '<span class="score-colon">:</span>'
+        + '<input class="score-input" id="pa-' + m.id + '" type="number" min="0" max="20" value="' + (pred ? pred.a : '') + '" placeholder="0">'
+        + '</div>'
+        + '<button class="save-btn ' + (saved ? 'saved' : '') + '" id="savebtn-' + m.id + '" onclick="savePred(\'' + m.id + '\')">'
+        + (saved ? '&#x2705; 已保存，点击修改' : '确认预测')
+        + '</button></div>';
     }
-    return '<div class="match-card '+(m.status==='live'?'live':'') +'">'
-      +'<div class="match-meta"><span class="match-date">'+m.date+'</span>'+metaBadges+'</div>'
-      +'<div class="match-teams">'
-      +'<div class="team"><span class="flag">'+m.hf+'</span><span class="team-name">'+m.home+'</span></div>'
-      +'<div class="score-box">'+scoreHTML+'</div>'
-      +'<div class="team right"><span class="team-name">'+m.away+'</span><span class="flag">'+m.af+'</span></div>'
-      +'</div>'+predHTML+'</div>';
+    return '<div class="match-card ' + (m.status === 'live' ? 'live' : '') + '">'
+      + '<div class="match-meta"><span class="match-date">' + m.date + '</span>' + metaBadges + '</div>'
+      + '<div class="match-teams">'
+      + '<div class="team"><span class="flag">' + m.hf + '</span><span class="team-name">' + m.home + '</span></div>'
+      + '<div class="score-box">' + scoreHTML + '</div>'
+      + '<div class="team right"><span class="team-name">' + m.away + '</span><span class="flag">' + m.af + '</span></div>'
+      + '</div>' + predHTML + '</div>';
   }).join('');
 }
 
-window.savePred = async function(mid){
-  const h = parseInt(document.getElementById('ph-'+mid).value);
-  const a = parseInt(document.getElementById('pa-'+mid).value);
-  if(isNaN(h)||isNaN(a)){alert('请填入完整比分');return;}
-  const btn = document.getElementById('savebtn-'+mid);
-  btn.classList.add('saving'); btn.textContent='保存中...';
-  userPreds[mid] = {h,a};
-  await saveUserData();
-  btn.classList.remove('saving'); btn.classList.add('saved'); btn.textContent='&#x2705; 已保存，点击修改';
+window.savePred = async function(mid) {
+  const h = parseInt(document.getElementById('ph-' + mid).value);
+  const a = parseInt(document.getElementById('pa-' + mid).value);
+  if (isNaN(h) || isNaN(a) || h < 0 || a < 0) { showToast('请填入完整比分'); return; }
+  const btn = document.getElementById('savebtn-' + mid);
+  btn.classList.add('saving'); btn.textContent = '保存中...';
+  try {
+    userPreds[mid] = { h, a };
+    await saveUserData();
+    btn.classList.remove('saving'); btn.classList.add('saved'); btn.textContent = '&#x2705; 已保存，点击修改';
+    showToast('保存成功！');
+  } catch (e) {
+    btn.classList.remove('saving'); btn.textContent = '重试保存';
+    showToast('保存失败，请检查网络');
+  }
 };
 
-async function renderLeaderboard(){
+async function renderLeaderboard() {
   const c = document.getElementById('leaderboard-list');
-  c.innerHTML='<div class="loading">加载中...</div>';
-  try{
+  c.innerHTML = '<div class="loading">加载排行榜...</div>';
+  try {
     const docs = await fsList('users');
-    const users = docs.map(d=>{
+    if (!docs.length) { c.innerHTML = '<div class="empty">还没有人预测，快去填写吧！</div>'; return; }
+    const users = docs.map(d => {
       const data = parseDoc(d);
       const preds = (typeof data.predictions === 'object' && data.predictions !== null) ? data.predictions : {};
-      const score = calcScore(preds);
-      return {name: data.nickname || d.name.split('/').pop(), ...score};
+      return { name: data.nickname || d.name.split('/').pop(), ...calcScore(preds) };
     });
-    users.sort((a,b)=>b.total-a.total||b.exact-a.exact);
-    if(!users.length){c.innerHTML='<div class="empty">还没有人预测，快去填写吧！</div>';return;}
-    const medals = ['&#x1F947;','&#x1F948;','&#x1F949;'];
-    c.innerHTML = users.map((u,i)=>{
-      const isMe = u.name===currentUser;
-      const nc = i===0?'gold':i===1?'silver':i===2?'bronze':'';
-      return '<div class="rank-card '+(isMe?'me ':''+(i===0?'top1':''))+'">'
-        +'<div class="rank-num '+nc+'">'+(medals[i]||(i+1))+'</div>'
-        +'<div class="rank-info"><div class="rank-name">'+u.name+(isMe?' &#x1F448;':'')+'</div>'
-        +'<div class="rank-detail">&#x1F3AF; '+u.exact+'场完全猜中 &nbsp;&#x2705; '+u.correct+'场猜中胜负</div></div>'
-        +'<div><div class="rank-score">'+u.total+'</div><div class="rank-score-label">分</div></div></div>';
+    users.sort((a, b) => b.total - a.total || b.exact - a.exact);
+    const medals = ['&#x1F947;', '&#x1F948;', '&#x1F949;'];
+    c.innerHTML = users.map((u, i) => {
+      const isMe = u.name === currentUser;
+      const nc = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+      return '<div class="rank-card ' + (isMe ? 'me ' : '') + (i === 0 ? 'top1' : '') + '">'
+        + '<div class="rank-num ' + nc + '">' + (medals[i] || (i + 1)) + '</div>'
+        + '<div class="rank-info"><div class="rank-name">' + u.name + (isMe ? ' &#x1F448;' : '') + '</div>'
+        + '<div class="rank-detail">&#x1F3AF; ' + u.exact + '场完全猜中 &nbsp;&#x2705; ' + u.correct + '场猜中胜负</div></div>'
+        + '<div><div class="rank-score">' + u.total + '</div><div class="rank-score-label">分</div></div></div>';
     }).join('');
-  }catch(e){c.innerHTML='<div class="empty">加载失败，请刷新重试</div>';}
+  } catch (e) {
+    c.innerHTML = '<div class="empty">加载失败，请刷新重试<br><small>' + e.message + '</small></div>';
+  }
 }
 
-function renderChampion(){
+function renderChampion() {
   const display = document.getElementById('my-champ-display');
-  if(userChampion){ const t=champTeams.find(x=>x.n===userChampion); display.innerHTML='你选了 '+(t?t.f:'')+' '+userChampion+' &#x1F3C6;'; }
-  else display.textContent='还没选，快来选！';
-  document.getElementById('champ-grid').innerHTML = champTeams.map(t=>
-    '<button class="champ-btn '+(userChampion===t.n?'picked':'')+'" onclick="pickChampion(\''+t.n+'\')">'
-    +'<span class="champ-flag">'+t.f+'</span><span class="champ-name">'+t.n+'</span></button>'
+  if (userChampion) {
+    const t = champTeams.find(x => x.n === userChampion);
+    display.innerHTML = '你选了 ' + (t ? t.f : '') + ' ' + userChampion + ' &#x1F3C6;';
+  } else display.textContent = '还没选，快来选！';
+  document.getElementById('champ-grid').innerHTML = champTeams.map(t =>
+    '<button class="champ-btn ' + (userChampion === t.n ? 'picked' : '') + '" onclick="pickChampion(\'' + t.n + '\')">'
+    + '<span class="champ-flag">' + t.f + '</span><span class="champ-name">' + t.n + '</span></button>'
   ).join('');
 }
 
-window.pickChampion = async function(name){
-  userChampion = name; await saveUserData(); renderChampion();
+window.pickChampion = async function(name) {
+  userChampion = name;
+  try {
+    await saveUserData(); renderChampion(); showToast('已选 ' + name + ' 为冠军！');
+  } catch (e) {
+    showToast('保存失败，请重试');
+  }
 };
 
-function renderMyPicks(){
+function renderMyPicks() {
   const score = calcScore(userPreds);
   const total = Object.keys(userPreds).length;
   document.getElementById('my-stats').innerHTML =
-    '<div class="stat-box"><div class="stat-val">'+total+'</div><div class="stat-lbl">已预测</div></div>'
-    +'<div class="stat-box"><div class="stat-val" style="color:#f0a500">'+score.exact+'</div><div class="stat-lbl">&#x1F3AF; 完全猜中</div></div>'
-    +'<div class="stat-box"><div class="stat-val">'+score.total+'</div><div class="stat-lbl">总分</div></div>';
-  if(!total){document.getElementById('my-picks-list').innerHTML='<div class="empty">去"赛程"填入你的比分预测吧 &#x26BD;</div>';return;}
-  document.getElementById('my-picks-list').innerHTML = Object.entries(userPreds).map(([mid,p])=>{
-    const m = matches.find(x=>x.id===mid); if(!m)return'';
-    const hasFinal = m.rhs!==null&&m.ras!==null;
-    let icon='';
-    if(hasFinal){ if(p.h===m.rhs&&p.a===m.ras)icon='&#x1F3AF;'; else if(getOutcome(p.h,p.a)===getOutcome(m.rhs,m.ras))icon='&#x2705;'; else icon='&#x274C;'; }
-    return '<div class="pick-item"><span class="pick-flags">'+m.hf+' '+m.af+'</span>'
-      +'<span class="pick-match">'+m.home+' vs '+m.away+'</span>'
-      +'<span class="pick-score">'+p.h+':'+p.a+'</span>'
-      +'<span class="pick-result">'+icon+'</span></div>';
+    '<div class="stat-box"><div class="stat-val">' + total + '</div><div class="stat-lbl">已预测</div></div>'
+    + '<div class="stat-box"><div class="stat-val" style="color:#f0a500">' + score.exact + '</div><div class="stat-lbl">&#x1F3AF; 完全猜中</div></div>'
+    + '<div class="stat-box"><div class="stat-val">' + score.total + '</div><div class="stat-lbl">总分</div></div>';
+  if (!total) { document.getElementById('my-picks-list').innerHTML = '<div class="empty">去"赛程"填入你的比分预测吧 &#x26BD;</div>'; return; }
+  document.getElementById('my-picks-list').innerHTML = Object.entries(userPreds).map(([mid, p]) => {
+    const m = matches.find(x => x.id === mid); if (!m) return '';
+    const hasFinal = m.rhs !== null && m.ras !== null;
+    let icon = '';
+    if (hasFinal) {
+      if (p.h === m.rhs && p.a === m.ras) icon = '&#x1F3AF;';
+      else if (getOutcome(p.h, p.a) === getOutcome(m.rhs, m.ras)) icon = '&#x2705;';
+      else icon = '&#x274C;';
+    }
+    return '<div class="pick-item"><span class="pick-flags">' + m.hf + ' ' + m.af + '</span>'
+      + '<span class="pick-match">' + m.home + ' vs ' + m.away + '</span>'
+      + '<span class="pick-score">' + p.h + ':' + p.a + '</span>'
+      + '<span class="pick-result">' + icon + '</span></div>';
   }).join('');
 }
 
 const savedName = localStorage.getItem('wc_nickname');
-if(savedName){
+if (savedName) {
   currentUser = savedName;
-  loadUserData().then(()=>goToMain(savedName));
+  loadUserData()
+    .then(() => goToMain(savedName))
+    .catch(() => {
+      goToMain(savedName);
+      showToast('云端加载失败，显示本地缓存');
+    });
 }
 </script>
 </body>
