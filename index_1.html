@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>⚽ 世界杯2026 比分预测</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --green: #1a8a4a; --green-light: #e8f5ee;
+  --gold: #f0a500; --gold-light: #fff8e6;
+  --red: #e24b4a; --red-light: #fff0f0;
+  --blue: #2563eb; --blue-light: #eff6ff;
+  --gray: #6b7280; --gray-light: #f3f4f6;
+  --border: #e5e7eb; --text: #111827; --text-muted: #6b7280;
+  --radius: 12px; --radius-sm: 8px;
+}
+body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif; background: #f0f4f0; color: var(--text); min-height: 100vh; }
+.screen { display: none; }
+.screen.active { display: block; }
+#login-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #1a4a2e 0%, #2d7a4f 50%, #1a8a4a 100%); padding: 2rem; }
+.login-box { background: white; border-radius: 20px; padding: 2.5rem 2rem; text-align: center; width: 100%; max-width: 380px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+.login-emoji { font-size: 56px; margin-bottom: 1rem; }
+.login-box h1 { font-size: 24px; font-weight: 700; line-height: 1.3; margin-bottom: .75rem; }
+.login-sub { font-size: 14px; color: var(--text-muted); margin-bottom: 1.75rem; line-height: 1.6; }
+#nickname-input { width: 100%; padding: 14px 16px; border: 1.5px solid var(--border); border-radius: var(--radius); font-size: 16px; text-align: center; margin-bottom: 12px; outline: none; transition: border-color .2s; }
+#nickname-input:focus { border-color: var(--green); }
+#login-btn { width: 100%; padding: 14px; background: var(--green); color: white; border: none; border-radius: var(--radius); font-size: 16px; font-weight: 600; cursor: pointer; }
+#login-btn:hover { background: #157a3e; }
+.login-hint { font-size: 12px; color: #9ca3af; margin-top: 12px; }
+header { background: var(--green); color: white; position: sticky; top: 0; z-index: 100; }
+.header-inner { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; max-width: 600px; margin: 0 auto; }
+.header-title { font-size: 16px; font-weight: 600; }
+.header-user { font-size: 13px; background: rgba(255,255,255,0.2); padding: 4px 10px; border-radius: 20px; }
+.tab-bar { display: flex; background: white; border-bottom: 1px solid var(--border); position: sticky; top: 49px; z-index: 99; max-width: 600px; margin: 0 auto; }
+.tab-btn { flex: 1; padding: 12px 4px; border: none; background: transparent; font-size: 13px; color: var(--text-muted); cursor: pointer; border-bottom: 2.5px solid transparent; font-weight: 500; }
+.tab-btn.active { color: var(--green); border-bottom-color: var(--green); }
+.content { max-width: 600px; margin: 0 auto; padding: 16px; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+.filter-row { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.filter-btn { padding: 5px 14px; border-radius: 20px; border: 1px solid var(--border); background: white; font-size: 12px; color: var(--text-muted); cursor: pointer; }
+.filter-btn.active { background: var(--green); color: white; border-color: var(--green); }
+.match-card { background: white; border-radius: var(--radius); padding: 14px; margin-bottom: 10px; border: 1px solid var(--border); }
+.match-card.live { border-color: var(--red); border-width: 1.5px; }
+.match-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.match-date { font-size: 12px; color: var(--text-muted); }
+.badge { font-size: 10px; padding: 2px 8px; border-radius: 4px; font-weight: 500; }
+.badge-group { background: var(--gray-light); color: var(--gray); }
+.badge-live { background: var(--red-light); color: var(--red); }
+.badge-done { background: var(--gray-light); color: var(--gray); }
+.match-teams { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
+.team { display: flex; align-items: center; gap: 8px; }
+.team.right { flex-direction: row-reverse; }
+.flag { font-size: 24px; }
+.team-name { font-size: 14px; font-weight: 500; }
+.team.right .team-name { text-align: right; }
+.score-box { text-align: center; min-width: 64px; }
+.real-score { font-size: 22px; font-weight: 700; letter-spacing: 2px; }
+.real-score.live { color: var(--red); }
+.vs { font-size: 14px; color: #d1d5db; font-weight: 600; }
+.pred-section { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.pred-label { font-size: 11px; color: var(--text-muted); text-align: center; margin-bottom: 8px; }
+.score-input-row { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.score-input { width: 56px; height: 44px; text-align: center; font-size: 20px; font-weight: 700; border: 1.5px solid var(--border); border-radius: var(--radius-sm); background: var(--gray-light); color: var(--text); outline: none; }
+.score-input:focus { border-color: var(--green); background: white; }
+.score-colon { font-size: 22px; color: var(--text-muted); font-weight: 700; }
+.save-btn { display: block; width: 100%; margin-top: 10px; padding: 9px; border-radius: var(--radius-sm); border: 1.5px solid var(--green); background: white; color: var(--green); font-size: 13px; font-weight: 600; cursor: pointer; }
+.save-btn:hover { background: var(--green-light); }
+.save-btn.saved { background: var(--green); color: white; }
+.save-btn.saving { opacity: .6; pointer-events: none; }
+.pred-display { text-align: center; padding: 8px 12px; background: var(--blue-light); border-radius: var(--radius-sm); margin-top: 6px; }
+.pred-display .pred-score { font-size: 20px; font-weight: 700; color: var(--blue); }
+.pred-display .pred-note { font-size: 11px; color: #3b82f6; margin-top: 2px; }
+.result-badge { text-align: center; padding: 6px; border-radius: var(--radius-sm); margin-top: 8px; font-size: 13px; font-weight: 500; }
+.result-badge.exact { background: var(--gold-light); color: #92400e; }
+.result-badge.correct { background: var(--green-light); color: #166534; }
+.result-badge.wrong { background: var(--red-light); color: #991b1b; }
+.leaderboard-header { margin-bottom: 14px; }
+.scoring-rules { display: flex; gap: 12px; font-size: 12px; color: var(--text-muted); flex-wrap: wrap; }
+.scoring-rules b { color: var(--text); }
+.rank-card { background: white; border-radius: var(--radius); padding: 14px 16px; margin-bottom: 8px; border: 1px solid var(--border); display: flex; align-items: center; gap: 14px; }
+.rank-card.me { border-color: var(--green); border-width: 2px; }
+.rank-card.top1 { border-color: var(--gold); background: var(--gold-light); }
+.rank-num { font-size: 20px; font-weight: 700; min-width: 32px; text-align: center; color: var(--text-muted); }
+.rank-num.gold { color: var(--gold); }
+.rank-num.silver { color: #9ca3af; }
+.rank-num.bronze { color: #b45309; }
+.rank-info { flex: 1; }
+.rank-name { font-size: 15px; font-weight: 600; }
+.rank-detail { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.rank-score { font-size: 22px; font-weight: 700; color: var(--green); }
+.rank-score-label { font-size: 11px; color: var(--text-muted); text-align: right; }
+.champ-intro { text-align: center; padding: .5rem 0 1.25rem; font-size: 14px; color: var(--text-muted); }
+#my-champ-display { margin-top: 8px; font-size: 18px; font-weight: 600; color: var(--text); }
+#champ-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.champ-btn { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 6px; border-radius: var(--radius-sm); border: 1.5px solid var(--border); background: white; cursor: pointer; }
+.champ-btn:hover { border-color: var(--green); }
+.champ-btn.picked { border-color: var(--green); border-width: 2px; background: var(--green-light); }
+.champ-flag { font-size: 26px; }
+.champ-name { font-size: 11px; color: var(--text-muted); text-align: center; line-height: 1.3; }
+.champ-btn.picked .champ-name { color: var(--green); font-weight: 600; }
+.stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+.stat-box { background: white; border-radius: var(--radius-sm); padding: 12px; text-align: center; border: 1px solid var(--border); }
+.stat-val { font-size: 22px; font-weight: 700; color: var(--green); }
+.stat-lbl { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.pick-item { background: white; border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 8px; border: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+.pick-flags { font-size: 18px; white-space: nowrap; }
+.pick-match { flex: 1; font-size: 13px; }
+.pick-score { font-size: 16px; font-weight: 700; color: var(--blue); min-width: 36px; text-align: center; }
+.pick-result { font-size: 18px; }
+.loading { text-align: center; padding: 2rem; color: var(--text-muted); font-size: 14px; }
+.empty { text-align: center; padding: 3rem 1rem; color: var(--text-muted); font-size: 14px; line-height: 1.8; }
+@media (max-width: 380px) { #champ-grid { grid-template-columns: repeat(3, 1fr); } .team-name { font-size: 12px; } }
+</style>
+</head>
+<body>
+
+<div id="login-screen" class="screen active">
+  <div class="login-box">
+    <div class="login-emoji">⚽</div>
+    <h1>世界杯2026<br>比分预测挑战</h1>
+    <p class="login-sub">和朋友一起预测，赛后看谁猜得最准！</p>
+    <input id="nickname-input" type="text" placeholder="输入你的昵称" maxlength="12">
+    <button id="login-btn" onclick="enterApp()">进入预测 →</button>
+    <p class="login-hint">昵称将作为你的身份标识，填完后不能修改</p>
+  </div>
+</div>
+
+<div id="main-screen" class="screen">
+  <header>
+    <div class="header-inner">
+      <span class="header-title">⚽ 世界杯2026</span>
+      <span id="header-user" class="header-user"></span>
+    </div>
+  </header>
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="showTab('matches',this)">📅 赛程</button>
+    <button class="tab-btn" onclick="showTab('leaderboard',this)">🏆 排行</button>
+    <button class="tab-btn" onclick="showTab('champion',this)">👑 冠军</button>
+    <button class="tab-btn" onclick="showTab('mypicks',this)">🎯 我的</button>
+  </div>
+  <div class="content">
+    <div id="tab-matches" class="tab-content active">
+      <div class="filter-row">
+        <button class="filter-btn active" onclick="filterMatches('all',this)">全部</button>
+        <button class="filter-btn" onclick="filterMatches('live',this)">🔴 进行中</button>
+        <button class="filter-btn" onclick="filterMatches('upcoming',this)">即将开始</button>
+        <button class="filter-btn" onclick="filterMatches('done',this)">已结束</button>
+      </div>
+      <div id="matches-list"></div>
+    </div>
+    <div id="tab-leaderboard" class="tab-content">
+      <div class="leaderboard-header">
+        <div class="scoring-rules">
+          <span>🎯 完全猜中比分 <b>+3分</b></span>
+          <span>✅ 猜中胜负 <b>+1分</b></span>
+        </div>
+      </div>
+      <div id="leaderboard-list"><div class="loading">加载中...</div></div>
+    </div>
+    <div id="tab-champion" class="tab-content">
+      <div class="champ-intro">
+        <p>你觉得谁会举起大力神杯？</p>
+        <div id="my-champ-display"></div>
+      </div>
+      <div id="champ-grid"></div>
+    </div>
+    <div id="tab-mypicks" class="tab-content">
+      <div class="stats-row" id="my-stats"></div>
+      <div id="my-picks-list"></div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, doc, setDoc, getDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBFhOCXBRbZSB5as_lDcdsyTB9pHyQnAks",
+  authDomain: "worldcup2026-maomaocai.firebaseapp.com",
+  projectId: "worldcup2026-maomaocai",
+  storageBucket: "worldcup2026-maomaocai.firebasestorage.app",
+  messagingSenderId: "1009868972160",
+  appId: "1:1009868972160:web:b3844506efa84e07a2c665"
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const matches = [
+  {id:'m1',date:'6/11',home:'墨西哥',hf:'🇲🇽',away:'南非',af:'🇿🇦',group:'A',rhs:2,ras:0,status:'done'},
+  {id:'m2',date:'6/12',home:'美国',hf:'🇺🇸',away:'巴拉圭',af:'🇵🇾',group:'D',rhs:4,ras:1,status:'done'},
+  {id:'m3',date:'6/12',home:'加拿大',hf:'🇨🇦',away:'波黑',af:'🇧🇦',group:'B',rhs:1,ras:1,status:'done'},
+  {id:'m4',date:'6/13',home:'巴西',hf:'🇧🇷',away:'摩洛哥',af:'🇲🇦',group:'C',rhs:1,ras:1,status:'done'},
+  {id:'m5',date:'6/13',home:'阿根廷',hf:'🇦🇷',away:'阿尔及利亚',af:'🇩🇿',group:'J',rhs:null,ras:null,status:'done'},
+  {id:'m6',date:'6/13',home:'瑞士',hf:'🇨🇭',away:'卡塔尔',af:'🇶🇦',group:'B',rhs:1,ras:1,status:'done'},
+  {id:'m7',date:'6/13',home:'苏格兰',hf:'🏴󠁧󠁢󠁳󠁣󠁴󠁿',away:'海地',af:'🇭🇹',group:'C',rhs:1,ras:0,status:'done'},
+  {id:'m8',date:'6/14',home:'德国',hf:'🇩🇪',away:'库拉索',af:'🇨🇼',group:'E',rhs:7,ras:1,status:'done'},
+  {id:'m9',date:'6/14',home:'西班牙',hf:'🇪🇸',away:'佛得角',af:'🇨🇻',group:'H',rhs:0,ras:0,status:'done'},
+  {id:'m10',date:'6/15',home:'英格兰',hf:'🏴󠁧󠁢󠁥󠁮󠁧󠁿',away:'克罗地亚',af:'🇭🇷',group:'L',rhs:null,ras:null,status:'done'},
+  {id:'m11',date:'6/15',home:'法国',hf:'🇫🇷',away:'塞内加尔',af:'🇸🇳',group:'I',rhs:null,ras:null,status:'done'},
+  {id:'m12',date:'6/15',home:'比利时',hf:'🇧🇪',away:'埃及',af:'🇪🇬',group:'G',rhs:1,ras:1,status:'done'},
+  {id:'m13',date:'6/16',home:'沙特阿拉伯',hf:'🇸🇦',away:'乌拉圭',af:'🇺🇾',group:'H',rhs:1,ras:1,status:'done'},
+  {id:'m13b',date:'6/16',home:'伊朗',hf:'🇮🇷',away:'新西兰',af:'🇳🇿',group:'G',rhs:2,ras:2,status:'done'},
+  {id:'m14',date:'6/16',home:'日本',hf:'🇯🇵',away:'荷兰',af:'🇳🇱',group:'K',rhs:null,ras:null,status:'live'},
+  {id:'m14b',date:'6/16',home:'葡萄牙',hf:'🇵🇹',away:'刚果(金)',af:'🇨🇩',group:'F',rhs:null,ras:null,status:'live'},
+  {id:'m15',date:'6/17',home:'巴西',hf:'🇧🇷',away:'突尼斯',af:'🇹🇳',group:'K',rhs:null,ras:null,status:'upcoming'},
+  {id:'m16',date:'6/17',home:'英格兰',hf:'🏴󠁧󠁢󠁥󠁮󠁧󠁿',away:'克罗地亚',af:'🇭🇷',group:'L',rhs:null,ras:null,status:'upcoming'},
+  {id:'m17',date:'6/18',home:'德国',hf:'🇩🇪',away:'苏格兰',af:'🏴󠁧󠁢󠁳󠁣󠁴󠁿',group:'E',rhs:null,ras:null,status:'upcoming'},
+  {id:'m18',date:'6/18',home:'捷克',hf:'🇨🇿',away:'南非',af:'🇿🇦',group:'A',rhs:null,ras:null,status:'upcoming'},
+  {id:'m19',date:'6/19',home:'阿根廷',hf:'🇦🇷',away:'奥地利',af:'🇦🇹',group:'J',rhs:null,ras:null,status:'upcoming'},
+  {id:'m20',date:'6/20',home:'法国',hf:'🇫🇷',away:'挪威',af:'🇳🇴',group:'I',rhs:null,ras:null,status:'upcoming'},
+  {id:'m21',date:'6/21',home:'西班牙',hf:'🇪🇸',away:'沙特',af:'🇸🇦',group:'H',rhs:null,ras:null,status:'upcoming'},
+  {id:'m22',date:'6/22',home:'巴西',hf:'🇧🇷',away:'荷兰',af:'🇳🇱',group:'K',rhs:null,ras:null,status:'upcoming'},
+  {id:'m23',date:'6/26',home:'法国',hf:'🇫🇷',away:'挪威',af:'🇳🇴',group:'I',rhs:null,ras:null,status:'upcoming'},
+];
+
+const champTeams = [
+  {n:'阿根廷',f:'🇦🇷'},{n:'法国',f:'🇫🇷'},{n:'巴西',f:'🇧🇷'},{n:'英格兰',f:'🏴󠁧󠁢󠁥󠁮󠁧󠁿'},
+  {n:'西班牙',f:'🇪🇸'},{n:'德国',f:'🇩🇪'},{n:'葡萄牙',f:'🇵🇹'},{n:'荷兰',f:'🇳🇱'},
+  {n:'挪威',f:'🇳🇴'},{n:'美国',f:'🇺🇸'},{n:'墨西哥',f:'🇲🇽'},{n:'乌拉圭',f:'🇺🇾'},
+  {n:'日本',f:'🇯🇵'},{n:'韩国',f:'🇰🇷'},{n:'摩洛哥',f:'🇲🇦'},{n:'澳大利亚',f:'🇦🇺'},
+];
+
+let currentUser = null, userPreds = {}, userChampion = null, currentFilter = 'all';
+
+function getOutcome(h,a){ return h>a?'home':a>h?'away':'draw'; }
+function calcScore(preds){
+  let exact=0,correct=0;
+  matches.forEach(m=>{
+    const p=preds[m.id];
+    if(!p||m.rhs===null||m.ras===null)return;
+    if(p.h===m.rhs&&p.a===m.ras)exact++;
+    else if(getOutcome(p.h,p.a)===getOutcome(m.rhs,m.ras))correct++;
+  });
+  return{exact,correct,total:exact*3+correct};
+}
+
+function withTimeout(promise,ms){return Promise.race([promise,new Promise((_,reject)=>setTimeout(()=>reject(new Error("timeout")),ms))]);}
+async function loadUserData(){
+  try{
+    const snap=await withTimeout(getDoc(doc(db,"users",currentUser)),5000);
+    if(snap.exists()){const d=snap.data();userPreds=d.predictions||{};userChampion=d.champion||null;}
+  }catch(e){console.error(e);}
+}
+
+async function saveUserData(){
+  try{
+    await withTimeout(setDoc(doc(db,"users",currentUser),{nickname:currentUser,predictions:userPreds,champion:userChampion,updatedAt:Date.now()}),5000);
+  }catch(e){alert('保存失败，请检查网络');}
+}
+
+window.enterApp=async function(){
+  const input=document.getElementById('nickname-input');
+  const name=input.value.trim();
+  if(!name||name.length<2){input.focus();input.style.borderColor='#e24b4a';return;}
+  const btn=document.getElementById('login-btn');
+  btn.textContent='进入中...';btn.disabled=true;
+  localStorage.setItem('wc_nickname',name);
+  currentUser=name;
+  await loadUserData();
+  document.getElementById('login-screen').classList.remove('active');
+  document.getElementById('main-screen').classList.add('active');
+  document.getElementById('header-user').textContent='👤 '+name;
+  renderMatches();renderChampion();renderMyPicks();
+};
+
+window.showTab=function(t,btn){
+  document.querySelectorAll('.tab-content').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el=>el.classList.remove('active'));
+  document.getElementById('tab-'+t).classList.add('active');
+  btn.classList.add('active');
+  if(t==='leaderboard')renderLeaderboard();
+  if(t==='mypicks')renderMyPicks();
+  if(t==='champion')renderChampion();
+};
+
+window.filterMatches=function(f,btn){
+  currentFilter=f;
+  document.querySelectorAll('.filter-btn').forEach(el=>el.classList.remove('active'));
+  btn.classList.add('active');
+  renderMatches();
+};
+
+function renderMatches(){
+  const list=matches.filter(m=>currentFilter==='all'||m.status===currentFilter);
+  const c=document.getElementById('matches-list');
+  if(!list.length){c.innerHTML='<div class="empty">暂无比赛</div>';return;}
+  c.innerHTML=list.map(m=>{
+    const pred=userPreds[m.id];
+    const hasFinal=m.rhs!==null&&m.ras!==null;
+    let scoreHTML=m.status==='done'&&hasFinal
+      ?`<div class="real-score">${m.rhs}:${m.ras}</div>`
+      :m.status==='live'
+      ?`<div class="real-score live">?:?</div><div style="font-size:10px;color:#e24b4a;margin-top:3px">🔴 进行中</div>`
+      :`<div class="vs">VS</div>`;
+    let metaBadges=`<span class="badge badge-group">组${m.group}</span>`;
+    if(m.status==='live')metaBadges+=`<span class="badge badge-live">🔴 进行中</span>`;
+    if(m.status==='done')metaBadges+=`<span class="badge badge-done">已结束</span>`;
+    let predHTML='';
+    if(m.status==='done'){
+      if(pred){
+        const exact=hasFinal&&pred.h===m.rhs&&pred.a===m.ras;
+        const res=hasFinal&&getOutcome(pred.h,pred.a)===getOutcome(m.rhs,m.ras);
+        predHTML=`<div class="pred-section">
+          <div class="pred-display"><div class="pred-score">${pred.h}:${pred.a}</div><div class="pred-note">你的预测</div></div>
+          ${hasFinal?(exact?'<div class="result-badge exact">🎯 完全猜中！+3分</div>':res?'<div class="result-badge correct">✅ 猜中胜负 +1分</div>':'<div class="result-badge wrong">❌ 没猜中，继续加油</div>'):''}
+        </div>`;
+      }
+    }else{
+      const saved=!!pred;
+      predHTML=`<div class="pred-section">
+        <div class="pred-label">🎯 预测比分</div>
+        <div class="score-input-row">
+          <input class="score-input" id="ph-${m.id}" type="number" min="0" max="20" value="${pred?pred.h:''}" placeholder="0">
+          <span class="score-colon">:</span>
+          <input class="score-input" id="pa-${m.id}" type="number" min="0" max="20" value="${pred?pred.a:''}" placeholder="0">
+        </div>
+        <button class="save-btn ${saved?'saved':''}" id="savebtn-${m.id}" onclick="window.savePred('${m.id}')">
+          ${saved?'✅ 已保存，点击修改':'确认预测'}
+        </button>
+      </div>`;
+    }
+    return `<div class="match-card ${m.status==='live'?'live':''}">
+      <div class="match-meta"><span class="match-date">${m.date}</span>${metaBadges}</div>
+      <div class="match-teams">
+        <div class="team"><span class="flag">${m.hf}</span><span class="team-name">${m.home}</span></div>
+        <div class="score-box">${scoreHTML}</div>
+        <div class="team right"><span class="team-name">${m.away}</span><span class="flag">${m.af}</span></div>
+      </div>
+      ${predHTML}
+    </div>`;
+  }).join('');
+}
+
+window.savePred=async function(mid){
+  const h=parseInt(document.getElementById('ph-'+mid).value);
+  const a=parseInt(document.getElementById('pa-'+mid).value);
+  if(isNaN(h)||isNaN(a)){alert('请填入完整比分');return;}
+  const btn=document.getElementById('savebtn-'+mid);
+  btn.classList.add('saving');btn.textContent='保存中...';
+  userPreds[mid]={h,a};
+  await saveUserData();
+  btn.classList.remove('saving');btn.classList.add('saved');btn.textContent='✅ 已保存，点击修改';
+};
+
+async function renderLeaderboard(){
+  const c=document.getElementById('leaderboard-list');
+  c.innerHTML='<div class="loading">加载中...</div>';
+  try{
+    const snap=await getDocs(collection(db,'users'));
+    const users=[];
+    snap.forEach(d=>{const data=d.data();const score=calcScore(data.predictions||{});users.push({name:data.nickname||d.id,...score});});
+    users.sort((a,b)=>b.total-a.total||b.exact-a.exact);
+    if(!users.length){c.innerHTML='<div class="empty">还没有人预测，快去填写吧！</div>';return;}
+    const medals=['🥇','🥈','🥉'];
+    c.innerHTML=users.map((u,i)=>{
+      const isMe=u.name===currentUser;
+      const nc=i===0?'gold':i===1?'silver':i===2?'bronze':'';
+      return `<div class="rank-card ${isMe?'me':''} ${i===0?'top1':''}">
+        <div class="rank-num ${nc}">${medals[i]||(i+1)}</div>
+        <div class="rank-info">
+          <div class="rank-name">${u.name}${isMe?' 👈':''}</div>
+          <div class="rank-detail">🎯 ${u.exact}场完全猜中 &nbsp;✅ ${u.correct}场猜中胜负</div>
+        </div>
+        <div><div class="rank-score">${u.total}</div><div class="rank-score-label">分</div></div>
+      </div>`;
+    }).join('');
+  }catch(e){c.innerHTML='<div class="empty">加载失败，请刷新重试</div>';}
+}
+
+function renderChampion(){
+  const display=document.getElementById('my-champ-display');
+  if(userChampion){const t=champTeams.find(x=>x.n===userChampion);display.textContent=`你选了 ${t?.f||''} ${userChampion} 🏆`;}
+  else display.textContent='还没选，快来选！';
+  document.getElementById('champ-grid').innerHTML=champTeams.map(t=>`
+    <button class="champ-btn ${userChampion===t.n?'picked':''}" onclick="window.pickChampion('${t.n}')">
+      <span class="champ-flag">${t.f}</span>
+      <span class="champ-name">${t.n}</span>
+    </button>`).join('');
+}
+
+window.pickChampion=async function(name){
+  userChampion=name;await saveUserData();renderChampion();
+};
+
+function renderMyPicks(){
+  const score=calcScore(userPreds);
+  const total=Object.keys(userPreds).length;
+  document.getElementById('my-stats').innerHTML=`
+    <div class="stat-box"><div class="stat-val">${total}</div><div class="stat-lbl">已预测</div></div>
+    <div class="stat-box"><div class="stat-val" style="color:#f0a500">${score.exact}</div><div class="stat-lbl">🎯 完全猜中</div></div>
+    <div class="stat-box"><div class="stat-val">${score.total}</div><div class="stat-lbl">总分</div></div>`;
+  if(!total){document.getElementById('my-picks-list').innerHTML='<div class="empty">去"赛程"填入你的比分预测吧 ⚽</div>';return;}
+  document.getElementById('my-picks-list').innerHTML=Object.entries(userPreds).map(([mid,p])=>{
+    const m=matches.find(x=>x.id===mid);if(!m)return'';
+    const hasFinal=m.rhs!==null&&m.ras!==null;
+    let icon='';
+    if(hasFinal){if(p.h===m.rhs&&p.a===m.ras)icon='🎯';else if(getOutcome(p.h,p.a)===getOutcome(m.rhs,m.ras))icon='✅';else icon='❌';}
+    return `<div class="pick-item">
+      <span class="pick-flags">${m.hf}${m.af}</span>
+      <span class="pick-match">${m.home} vs ${m.away}</span>
+      <span class="pick-score">${p.h}:${p.a}</span>
+      <span class="pick-result">${icon}</span>
+    </div>`;
+  }).join('');
+}
+
+const savedName=localStorage.getItem('wc_nickname');
+if(savedName){
+  currentUser=savedName;
+  loadUserData().then(()=>{
+    document.getElementById('login-screen').classList.remove('active');
+    document.getElementById('main-screen').classList.add('active');
+    document.getElementById('header-user').textContent='👤 '+savedName;
+    renderMatches();renderChampion();renderMyPicks();
+  });
+}
+</script>
+</body>
+</html>
