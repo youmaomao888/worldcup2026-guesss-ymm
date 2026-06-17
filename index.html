@@ -385,18 +385,34 @@ async function syncRealScores() {
     const feed = {};
     (data.matches || []).forEach(fm => {
       const ft = fm.score && fm.score.ft;
-      if (Array.isArray(ft) && ft.length === 2) feed[fm.team1 + '|' + fm.team2] = ft;
+      feed[fm.team1 + '|' + fm.team2] = {
+        ft: (Array.isArray(ft) && ft.length === 2) ? ft : null,
+        ko: kickoffMs(fm.date, fm.time)
+      };
     });
+    const now = Date.now();
+    const LIVE_WINDOW = 2.5 * 3600 * 1000; // 开球后约2.5小时算进行中
     let changed = 0;
     matches.forEach(m => {
       const en1 = TEAM_EN[m.home], en2 = TEAM_EN[m.away];
       if (!en1 || !en2) return;
-      let ft = feed[en1 + '|' + en2], swap = false;
-      if (!ft) { ft = feed[en2 + '|' + en1]; swap = !!ft; }
-      if (!ft) return;
-      const h = swap ? ft[1] : ft[0], a = swap ? ft[0] : ft[1];
-      if (m.rhs !== h || m.ras !== a || m.status !== 'done') {
-        m.rhs = h; m.ras = a; m.status = 'done'; changed++;
+      let fm = feed[en1 + '|' + en2], swap = false;
+      if (!fm) { fm = feed[en2 + '|' + en1]; swap = !!fm; }
+      if (!fm) return;
+      let ns = m.status, nh = m.rhs, na = m.ras;
+      if (fm.ft) {                                   // 有最终比分 → 已结束
+        nh = swap ? fm.ft[1] : fm.ft[0]; na = swap ? fm.ft[0] : fm.ft[1]; ns = 'done';
+      } else if (m.status === 'done' && m.rhs !== null) {
+        // 已有内置最终比分，数据源暂缺，保持已结束不降级
+      } else if (fm.ko && now >= fm.ko && now < fm.ko + LIVE_WINDOW) {
+        ns = 'live';                                 // 开球时段内、暂无比分 → 进行中
+      } else if (fm.ko && now >= fm.ko + LIVE_WINDOW) {
+        ns = 'pending';                              // 已过比赛时段、仍无比分 → 完场待更新
+      } else {
+        ns = 'upcoming';
+      }
+      if (ns !== m.status || nh !== m.rhs || na !== m.ras) {
+        m.status = ns; m.rhs = nh; m.ras = na; changed++;
       }
     });
     if (changed > 0) { renderMatches(); }
@@ -404,6 +420,15 @@ async function syncRealScores() {
   } catch (e) {
     if (note) note.textContent = '⚽ 比分为内置数据（实时同步暂不可用）';
   }
+}
+
+// 解析 openfootball 的开球时间，如 "20:00 UTC-5" + "2026-06-16" → 毫秒时间戳
+function kickoffMs(date, time) {
+  const m = /(\d{1,2}):(\d{2})\s*UTC([+-]\d{1,2})/.exec(time || '');
+  if (!m || !date) return null;
+  const off = (parseInt(m[3], 10) < 0 ? '-' : '+') + String(Math.abs(parseInt(m[3], 10))).padStart(2, '0') + ':00';
+  const ts = Date.parse(date + 'T' + m[1].padStart(2, '0') + ':' + m[2] + ':00' + off);
+  return isNaN(ts) ? null : ts;
 }
 
 const champTeams = [
@@ -643,15 +668,17 @@ function renderMatches() {
     if (m.status === 'live') metaBadges += '<span class="badge badge-live">&#x1F534; 进行中</span>';
     if (m.status === 'done') metaBadges += '<span class="badge badge-done">已结束</span>';
     let predHTML = '';
-    if (m.status === 'done') {
+    if (m.status === 'done' || m.status === 'live') {
+      // 已开赛或已结束 → 锁盘，只展示已有预测，不能再改
       if (pred) {
-        const exact = hasFinal && pred.h === m.rhs && pred.a === m.ras;
-        const res = hasFinal && getOutcome(pred.h, pred.a) === getOutcome(m.rhs, m.ras);
+        const exact = m.status === 'done' && hasFinal && pred.h === m.rhs && pred.a === m.ras;
+        const res = m.status === 'done' && hasFinal && getOutcome(pred.h, pred.a) === getOutcome(m.rhs, m.ras);
         predHTML = '<div class="pred-section"><div class="pred-display"><div class="pred-score">' + pred.h + ':' + pred.a + '</div><div class="pred-note">你的预测</div></div>'
-          + (hasFinal ? (exact ? '<div class="result-badge exact">&#x1F3AF; 完全猜中！+3分</div>' : res ? '<div class="result-badge correct">&#x2705; 猜中胜负 +1分</div>' : '<div class="result-badge wrong">&#x274C; 没猜中，继续加油</div>') : '')
+          + (m.status === 'done' && hasFinal ? (exact ? '<div class="result-badge exact">&#x1F3AF; 完全猜中！+3分</div>' : res ? '<div class="result-badge correct">&#x2705; 猜中胜负 +1分</div>' : '<div class="result-badge wrong">&#x274C; 没猜中，继续加油</div>') : '')
+          + (m.status === 'live' ? '<div class="result-badge" style="background:var(--red-light);color:#991b1b">&#x1F512; 已开赛，预测锁定</div>' : '')
           + '</div>';
       } else {
-        predHTML = '<div class="pred-section"><div class="pred-display" style="background:var(--gray-light)"><div class="pred-note" style="color:var(--text-muted)">未预测此场</div></div></div>';
+        predHTML = '<div class="pred-section"><div class="pred-display" style="background:var(--gray-light)"><div class="pred-note" style="color:var(--text-muted)">' + (m.status === 'live' ? '&#x1F512; 已开赛，未预测此场' : '未预测此场') + '</div></div></div>';
       }
     } else {
       const saved = !!pred;
@@ -676,6 +703,8 @@ function renderMatches() {
 }
 
 window.savePred = async function(mid) {
+  const mm = matches.find(x => x.id === mid);
+  if (mm && mm.status !== 'upcoming') { showToast('比赛已开始，无法预测'); renderMatches(); return; }
   const h = parseInt(document.getElementById('ph-' + mid).value);
   const a = parseInt(document.getElementById('pa-' + mid).value);
   if (isNaN(h) || isNaN(a) || h < 0 || a < 0) { showToast('请填入完整比分'); return; }
